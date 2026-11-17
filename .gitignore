@@ -1,0 +1,61 @@
+# --- Secrets: never commit ---
+.env
+.env.local
+.env.*.local
+.env.production
+!packages/tab/.env.production
+.env.test
+.env.dev
+edge.env
+.dev.vars
+**/.secrets/
+*.p8
+*.p12
+*.pem
+*.key
+*.pfx
+*.cert
+*.crt
+service_account.json
+credentials.json
+
+# --- Local databases ---
+*.sqlite
+*.db
+
+# --- Node ---
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+.eslintcache
+coverage/
+*.lcov
+# tsc has noEmit; stray compiled JS would shadow the .tsx during the Vite build
+packages/tab/src/**/*.js
+
+# --- Build artifacts ---
+*.zip
+*.tgz
+apps/*/native-app/output/
+
+# --- Generated at deploy time from apps/teams/.env ---
+packages/teams-manifest/manifest.json
+packages/teams-edge/wrangler.local.jsonc
+apps/teams/native-app/streamlit/setup_wizard_dev.py
+apps/teams/native-app/streamlit/output
+
+# --- Local tooling / scratch ---
+temp/
+.wrangler/
+.edge.log
+.*.tmp.json
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

@@ -1,0 +1,80 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+name: ci-teams
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-teams-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Edge Worker dry-run bundle
+        run: npm run deploy:dry-run -w packages/teams-edge
+
+  docker-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      # Source-only shared packages: a missing COPY only fails at container start, so build and start the image.
+      - name: Build server image
+        run: docker build -f apps/teams/Dockerfile -t agents-teams-server:ci .
+      - name: Smoke start (module resolution and /healthz)
+        run: |
+          docker run -d --name smoke -p 3000:3000 \
+            -e AUTH_MODE=local-pat -e ALLOW_INSECURE_AUTH_MODE=1 -e HOST=0.0.0.0 \
+            -e SNOWFLAKE_ACCOUNT=ci-org-ci-acct -e SNOWFLAKE_PAT=ci-placeholder \
+            -e SNOWFLAKE_AGENT_FQN=DB.SCH.AGENT agents-teams-server:ci
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:3000/healthz && exit 0
+            sleep 1
+          done
+          docker logs smoke
+          exit 1
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: agents-teams-server:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+  docker-edge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Build edge image
+        run: docker build -f apps/teams/edge.Dockerfile -t agents-teams-edge:ci .
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: agents-teams-edge:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+  native-app-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: '3.12' }
+      - run: pip install snowflake-cli
+      - name: Bundle native app (offline)
+        working-directory: apps/teams/native-app
+        run: snow app bundle

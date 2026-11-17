@@ -1,0 +1,30 @@
+Snowflake Agents Embed
+Copyright 2026 Snowflake Inc.
+
+This is an open-source sample application published under Snowflake Labs.
+It is provided as-is, is not an officially supported Snowflake product, and
+carries no SLA or warranty. Use at your own risk.
+
+The project calls public Snowflake Cortex Agents APIs. It is distinct from
+official Snowflake CoWork (the first-party Snowsight interface for agents)
+and from the official Cortex Agents Microsoft Teams integration.
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file.
+
+Third-party notices
+
+- Plus Jakarta Sans (packages/chat-core/src/styles/PlusJakartaSans-VariableFont_wght.woff2)
+  is Copyright 2020 The Plus Jakarta Sans Project Authors
+  (https://github.com/tokotype/PlusJakartaSans) and is licensed under the
+  SIL Open Font License 1.1. The license text is in
+  packages/chat-core/src/styles/OFL.txt.
+
+- jszip (transitive, via deck.gl / loaders.gl) is dual-licensed
+  "MIT OR GPL-3.0-or-later". It is used here under its MIT option.
+
+- Development tooling only: the optional @img/sharp-libvips-* packages pulled in
+  by wrangler/miniflare are licensed LGPL-3.0-or-later. They are not bundled into
+  or distributed with this project's build outputs.
+
+Other npm dependencies are used under their own licenses, as recorded in
+package-lock.json.

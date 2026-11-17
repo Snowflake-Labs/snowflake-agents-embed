@@ -1,0 +1,28 @@
+{
+  "name": "@snowflake-agents-embed/cortex-server",
+  "version": "0.1.0",
+  "private": true,
+  "author": "Snowflake Inc.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./snowflake/*": "./src/snowflake/*.ts",
+    "./http/*": "./src/http/*.ts",
+    "./host/*": "./src/host/*.ts",
+    "./config/*": "./src/config/*.ts",
+    "./auth/*": "./src/auth/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "dotenv": "^16.4",
+    "hono": "^4.6",
+    "jose": "^5.9"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^5.5"
+  }
+}

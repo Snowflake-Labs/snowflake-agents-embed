@@ -1,0 +1,56 @@
+{
+  "name": "@snowflake-agents-embed/chat-core",
+  "version": "0.1.0",
+  "private": true,
+  "author": "Snowflake Inc.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./api/*": "./src/api/*.ts",
+    "./components/*": "./src/components/*.tsx",
+    "./hooks/*": "./src/hooks/*.ts",
+    "./lib/*": "./src/lib/*.ts",
+    "./store/*": "./src/store/*.ts",
+    "./host/*": "./src/host/*.ts",
+    "./styles/*": "./src/styles/*"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@deck.gl/core": "9.4.0",
+    "@deck.gl/geo-layers": "9.4.0",
+    "@deck.gl/layers": "9.4.0",
+    "@deck.gl/react": "9.4.0",
+    "@lexical/react": "^0.52.0",
+    "@lexical/selection": "^0.52.0",
+    "@lexical/utils": "^0.52.0",
+    "@tanstack/react-virtual": "^3.10",
+    "highlight.js": "^11.11.1",
+    "lexical": "^0.52.0",
+    "lucide-react": "^1.55.0",
+    "maplibre-gl": "6.14.0",
+    "react": "^19.3",
+    "react-dom": "^19.3",
+    "react-markdown": "^10.1.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "uuid": "^14.0.3",
+    "vega-embed": "^7.3",
+    "vega-interpreter": "^2.3",
+    "vega-lite": "^6.5",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16",
+    "@testing-library/user-event": "^14",
+    "@types/react": "^19.3",
+    "@types/react-dom": "^19.3",
+    "@vitejs/plugin-react": "^6.1",
+    "happy-dom": "^21.0.1",
+    "typescript": "^5.5",
+    "vite": "^8.3"
+  }
+}

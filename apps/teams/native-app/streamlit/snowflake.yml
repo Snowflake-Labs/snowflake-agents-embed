@@ -1,0 +1,23 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+definition_version: 2
+entities:
+  setup-wizard:
+    type: streamlit
+    identifier:
+      name: AGENTS_TEAMS_SETUP_WIZARD
+      database: agents_teams_app_db
+      schema: public
+    title: "Snowflake Agents for Teams (Unofficial) Setup Wizard"
+    main_file: setup_wizard.py
+    query_warehouse: XSMALL
+
+  setup-wizard-dev:
+    type: streamlit
+    identifier:
+      name: AGENTS_TEAMS_SETUP_WIZARD_DEV
+      database: agents_teams_app_db
+      schema: public
+    title: "Snowflake Agents for Teams (Unofficial) Setup Wizard (Dev)"
+    main_file: setup_wizard_dev.py
+    query_warehouse: XSMALL

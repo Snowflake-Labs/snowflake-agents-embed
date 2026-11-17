@@ -1,0 +1,132 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+manifest_version: 2
+
+artifacts:
+  setup_script: setup/setup.sql
+  readme: README.md
+  # Official field is default_streamlit (schema.object). default_streamlit_app is
+  # rejected on this account ("Unrecognized field").
+  default_streamlit: CONFIG.SETUP_WIZARD
+  container_services:
+    images:
+      # Provider-account image repository, same one scripts/deploy-spcs.sh already
+      # pushes to. Native App image references are paths, never a registry hostname.
+      # The tag is
+      # required here even though every Snowflake doc example omits one - confirmed via
+      # a real `snow app version create` ("Image ... not found") that only started
+      # working once a tag was added; matches a documented support case with the same
+      # root cause and fix. Native App image refs cannot take a registry @sha256;
+      # prefer the git-SHA tag CI already pushes over relying on :latest at review time.
+      - /agents_teams_app_db/public/na_image_repo/agents-teams-app:latest
+
+# The privilege name IS the YAML key - there is no separate `privilege:`/`object_name:`
+# sub-field, and there is no `usage_on_schema` privilege (the app owns its own schema
+# already; a consumer never needs to grant USAGE on it). CREATE SERVICE, CREATE NETWORK
+# RULE and CREATE INTEGRATION are also not valid manifest privilege names - all confirmed
+# against a real `snow app deploy`.
+privileges:
+  - CREATE COMPUTE POOL:
+      description: Required to run the server container on Snowpark Container Services.
+  - CREATE EXTERNAL ACCESS INTEGRATION:
+      description: Required to create the egress integration the server uses to reach Entra/Bot Framework.
+  - CREATE SECURITY INTEGRATION:
+      description: Required to create the External OAuth security integration for Teams SSO.
+  - BIND SERVICE ENDPOINT:
+      description: Required so the server's HTTPS endpoint is externally reachable from the tab/bot.
+
+# Cortex access is requested here, not as a `privileges` entry - Snowflake rejects
+# SNOWFLAKE.CORTEX_USER under `privileges` ("invalid or not supported in the application
+# manifest"). It belongs in snowflake_database.roles because it's an application role in
+# the SNOWFLAKE database, not an account-level privilege. See
+# https://docs.snowflake.com/en/developer-guide/native-apps/manifest-reference#snowflake-database-field.
+snowflake_database:
+  roles:
+    - CORTEX_USER:
+        description: >-
+          Required for the server to call Cortex Agents on the consumer's behalf.
+
+# setup.sql creates and grants READ on all 7 of these secrets; only 2 were previously
+# declared here. The other 5 (OBO_CLIENT_ID/SECRET, DEFAULT_AGENT_FQN, TEAMS_APP_ID,
+# AGENT_ALLOW_LIST) were a pre-existing gap between what the setup script actually
+# provisions and what the manifest tells a reviewer/consumer the app requests.
+references:
+  - BOT_APP_ID:
+      label: Azure Bot App ID
+      description: Application ID of the Azure Bot registration
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - BOT_APP_SECRET:
+      label: Azure Bot App Secret
+      description: Client secret for the Azure Bot registration
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - OBO_CLIENT_ID:
+      label: On-Behalf-Of app client ID
+      description: >-
+        Client ID of the Entra app used for the On-Behalf-Of token exchange
+        that turns a signed-in Teams user's token into a Snowflake token.
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - OBO_CLIENT_SECRET:
+      label: On-Behalf-Of app client secret
+      description: Client secret for the On-Behalf-Of Entra app above.
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - DEFAULT_AGENT_FQN:
+      label: Default agent
+      description: Fully-qualified Cortex Agent name, as DATABASE.SCHEMA.AGENT_NAME
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - TEAMS_APP_ID:
+      label: Teams app ID
+      description: App ID from the Teams app manifest, used to validate inbound bot activity.
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - AGENT_ALLOW_LIST:
+      label: Agent allow-list (optional)
+      description: >-
+        JSON array of {"fqn","displayName"} restricting which agents may be
+        called. Leave empty to fall back to DEFAULT_AGENT_FQN.
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - AZURE_TENANT_ID:
+      label: Azure AD tenant ID
+      description: >-
+        Entra tenant ID the OBO token exchange and External OAuth security
+        integration validate against.
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - SNOWFLAKE_SCOPE:
+      label: Snowflake OAuth scope
+      description: >-
+        API scope requested during the OBO exchange, of the form
+        api://<snowflake-app-id>/session:role-any.
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration
+  - APPS_API_HOST:
+      label: Snowflake Apps API host
+      description: >-
+        Region-specific apps-api hostname, e.g. apps-api.c1.<region>.app.snowflake.com.
+      privileges: [READ]
+      object_type: SECRET
+      register_callback: config.register_single_reference
+      configuration_callback: config.get_configuration

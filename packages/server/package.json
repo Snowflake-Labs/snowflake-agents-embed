@@ -1,0 +1,28 @@
+{
+  "name": "@snowflake-agents-embed/server",
+  "version": "0.1.0",
+  "private": true,
+  "author": "Snowflake Inc.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13",
+    "@snowflake-agents-embed/chat-core": "*",
+    "@snowflake-agents-embed/cortex-server": "*",
+    "botbuilder": "^4.23",
+    "hono": "^4.6",
+    "jose": "^5.9",
+    "tsx": "^4.19"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^5.5"
+  }
+}

@@ -1,0 +1,6 @@
+# Owners must have write access to the repository, otherwise GitHub silently ignores them.
+# Check the CODEOWNERS errors view after changing this file.
+*                       @sfc-gh-aross
+/packages/teams-edge/   @sfc-gh-aross
+/apps/teams/scripts/    @sfc-gh-aross
+/.github/               @sfc-gh-aross

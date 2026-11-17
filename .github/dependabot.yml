@@ -1,0 +1,20 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule: { interval: weekly }
+    groups:
+      dev-tooling:
+        dependency-type: development
+    ignore:
+      # @typescript-eslint peer range is <6.1.0
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: docker
+    directory: "/apps/teams"
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }

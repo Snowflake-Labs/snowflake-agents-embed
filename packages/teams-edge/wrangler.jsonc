@@ -1,0 +1,51 @@
+{
+  // Cloudflare Worker for the Agents Embed Teams edge: the tab SPA (static assets from
+  // ../tab/dist) plus the edge routes /api/*, /token/exchange and /token/link.
+  // Deploy with apps/teams/scripts/deploy-tab.sh, which builds the tab first.
+  //
+  // Runtime secrets are NOT here. apps/teams/scripts/set-edge-secrets.sh sets them all
+  // (wrangler secret bulk): AZURE_TENANT_ID, OBO_CLIENT_ID, OBO_CLIENT_SECRET, SNOWFLAKE_SCOPE,
+  // ENTRA_AUDIENCE_URI, SPCS_BASE, SPCS_PAT, EDGE_SESSION_SECRET, BOT_LINK_SECRET, BOT_APP_ID.
+  //
+  // Account-specific ids are placeholders here. deploy-tab.sh renders wrangler.local.jsonc (gitignored)
+  // from apps/teams/.env and deploys that: BOT_LINKS_KV_ID replaces REPLACE_WITH_KV_NAMESPACE_ID in both
+  // kv_namespaces entries (env sections do not inherit bindings), and SPCS_VPC_SERVICE_ID replaces
+  // REPLACE_WITH_VPC_SERVICE_ID. Never put real ids in this file. deploy-tab.sh --create makes the KV
+  // namespace and writes its id to .env; by hand: wrangler kv namespace create BOT_LINKS
+  //
+  // Custom domain (recommended over workers.dev, see docs/install-teams.md): set EDGE_CUSTOM_DOMAIN in
+  // apps/teams/.env. deploy-tab.sh adds { "pattern": <domain>, "custom_domain": true } to the rendered config.
+  "name": "agents-embed-teams",
+  "main": "src/workers/index.ts",
+  "compatibility_date": "2025-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../tab/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Without this, the SPA fallback could answer an edge route with index.html.
+    "run_worker_first": ["/api", "/api/*", "/token/*"]
+  },
+  "kv_namespaces": [{ "binding": "BOT_LINKS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+
+  "env": {
+    // NETWORK_MODE=privatelink: SPCS is reached through Workers VPC (a cloudflared tunnel in
+    // the customer VPC). Create the service with
+    //   wrangler vpc service create <name> --type http --tunnel-id <id> --hostname <privatelink ingress host>
+    // and put its id in apps/teams/.env as SPCS_VPC_SERVICE_ID. SPCS_BASE must be the
+    // privatelink_ingress_url origin. deploy-tab.sh refuses a privatelink deploy without it.
+    "privatelink": {
+      // Same Worker as the default env, so secrets, KV and the custom domain carry over.
+      "name": "agents-embed-teams",
+      "assets": {
+        "directory": "../tab/dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api", "/api/*", "/token/*"]
+      },
+      "kv_namespaces": [{ "binding": "BOT_LINKS", "id": "REPLACE_WITH_KV_NAMESPACE_ID" }],
+      "vars": { "SPCS_UPSTREAM": "vpc" },
+      "vpc_services": [{ "binding": "SPCS_VPC", "service_id": "REPLACE_WITH_VPC_SERVICE_ID", "remote": true }]
+    }
+  }
+}

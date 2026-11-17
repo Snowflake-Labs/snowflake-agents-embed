@@ -1,0 +1,86 @@
+/* Copyright 2026 Snowflake Inc. | SPDX-License-Identifier: Apache-2.0 */
+:root {
+  /* Light (default) tokens — measured off the native Cortex/CoWork app's own screenshots
+   * rather than trusted from its source, since several source tokens disagree with what
+   * actually renders. */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-alt: #f7f7f7;
+  --row-hover: #edeff1;
+  --border: #e0e0e0;
+  --text: #24272c;
+  --text-subtle: #646c7c;
+  --accent: #0077c1;
+  --accent-hover: #1f45c9;
+  --accent-contrast: #ffffff;
+  --accent-gradient: linear-gradient(90deg, #2e5cf6, #7b61ff);
+  --hero-accent: #448bdf;
+  --hero-gradient: linear-gradient(to right, #1e8ce6, #29b5e8, #4ec2c9);
+  --accent-tint-bg: #e5effd;
+  --accent-tint-text: #10161d;
+  --user-bubble: #eef4ff;
+  --user-bubble-text: #242424;
+  --assistant-bubble: #ffffff;
+  --error: #c4314b;
+  --error-bg: #fdf3f4;
+  --error-contrast: #ffffff;
+  --success: #13a10e;
+  --link: #2e5cf6;
+  --radius: 8px;
+  --radius-lg: 12px;
+  /* Three sizes, not the seven ad-hoc pixel values (11-16, 20) the hand-drawn composer
+   * icons used to be rendered at - lucide-react icons (see composer/icons.tsx) scale
+   * their stroke to compensate, which only holds together at a small, fixed set of sizes. */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, sans-serif;
+}
+
+html[data-agents-theme="dark"],
+html[data-teams-theme="dark"] {
+  --bg: #1f1f1f;
+  --surface: #2d2d2d;
+  --surface-alt: #292929;
+  --border: #3d3d3d;
+  --text: #ffffff;
+  --text-subtle: #adadad;
+  --accent: #6d93ff;
+  --accent-hover: #8ba7ff;
+  --accent-contrast: #1f1f1f;
+  --accent-gradient: linear-gradient(90deg, #6d93ff, #a48bff);
+  --accent-tint-bg: var(--user-bubble);
+  --accent-tint-text: var(--accent);
+  --user-bubble: #23395c;
+  --user-bubble-text: #ffffff;
+  --assistant-bubble: #2d2d2d;
+  --error: #f1707f;
+  --error-bg: #3a2427;
+  --error-contrast: #1f1f1f;
+  --success: #6ccb5f;
+  --link: #90c2f7;
+}
+
+html[data-agents-theme="contrast"],
+html[data-teams-theme="contrast"] {
+  --bg: #000000;
+  --surface: #000000;
+  --surface-alt: #0f0f0f;
+  --border: #ffffff;
+  --text: #ffffff;
+  --text-subtle: #ffff00;
+  --accent: #ffff00;
+  --accent-hover: #ffff01;
+  --accent-contrast: #000000;
+  --hero-accent: #ffff00;
+  --user-bubble: #000000;
+  --user-bubble-text: #ffffff;
+  --assistant-bubble: #000000;
+  --error: #ff9c00;
+  --error-bg: #000000;
+  --error-contrast: #000000;
+  --success: #ffff00;
+  --link: #ffff00;
+  --accent-tint-bg: var(--accent);
+  --accent-tint-text: var(--accent-contrast);
+}

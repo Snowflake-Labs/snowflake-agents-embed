@@ -1,0 +1,55 @@
+{
+  "name": "snowflake-agents-embed",
+  "private": true,
+  "author": "Snowflake Inc.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Snowflake-Labs/snowflake-agents-embed.git"
+  },
+  "homepage": "https://github.com/Snowflake-Labs/snowflake-agents-embed",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w packages/server",
+    "dev:tab": "npm run dev -w packages/tab",
+    "build": "npm run build -w packages/server && npm run build -w packages/tab",
+    "build:teams": "npm run build -w packages/server && npm run build -w packages/tab",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint 'packages/*/src/**/*.{ts,tsx}'"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8",
+    "eslint": "^10",
+    "eslint-plugin-react-hooks": "^7",
+    "happy-dom": "^21.0.1",
+    "typescript": "^5.5",
+    "vitest": "^5.0"
+  },
+  "overrides": {
+    "@deck.gl/core": "9.4.0",
+    "@deck.gl/extensions": "9.4.0",
+    "@deck.gl/widgets": "9.4.0",
+    "image-size": "2.0.4",
+    "axios": "1.20.0",
+    "fflate": "^0.7.5",
+    "@azure/msal-node": {
+      "uuid": "^11.1.1"
+    },
+    "botbuilder": {
+      "uuid": "^11.1.1"
+    },
+    "botbuilder-core": {
+      "uuid": "^11.1.1"
+    },
+    "texture-compressor": {
+      "argparse": "^2.0.1"
+    }
+  }
+}

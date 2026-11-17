@@ -1,0 +1,36 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+# Project definition for the Snowflake CLI (`snow app ...`). Added so this app can be
+# built/run/versioned with the real Native App lifecycle instead of the hand-rolled
+# ALTER SERVICE dance in scripts/deploy-spcs.sh.
+#
+# streamlit/setup_wizard.py is now bundled below as a real app artifact (Stage 4).
+# streamlit/snowflake.yml (a separate, unrelated project definition for `snow streamlit
+# deploy`) predates this and is no longer how the wizard ships - kept only because
+# apps/teams/README.md's standalone-deploy instructions still reference it.
+definition_version: 2
+entities:
+  agents_teams_package:
+    type: application package
+    stage: stage_content.agents_teams_stage
+    manifest: manifest.yml
+    identifier: agents_teams_package
+    artifacts:
+      - manifest.yml
+      - README.md
+      - src: setup/*
+        dest: setup/
+      - src: services/*
+        dest: services/
+      - src: streamlit/*.py
+        dest: streamlit/
+      - src: streamlit/environment.yml
+        dest: streamlit/environment.yml
+      - src: streamlit/img/*
+        dest: streamlit/img/
+  agents_teams_app:
+    type: application
+    from:
+      target: agents_teams_package
+    identifier: agents_teams_app
+    debug: false

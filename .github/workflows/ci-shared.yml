@@ -1,0 +1,29 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+name: ci-shared
+on:
+  pull_request:
+    paths: ['packages/chat-core/**', 'packages/cortex-server/**', 'package-lock.json', '.github/workflows/ci-shared.yml']
+  push:
+    branches: [main]
+    paths: ['packages/chat-core/**', 'packages/cortex-server/**', 'package-lock.json']
+permissions:
+  contents: read
+concurrency:
+  group: ci-shared-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  shared:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [chat-core, cortex-server]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck -w packages/${{ matrix.package }}
+      - run: npm test -w packages/${{ matrix.package }}

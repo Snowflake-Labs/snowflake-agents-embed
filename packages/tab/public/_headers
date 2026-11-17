@@ -1,0 +1,5 @@
+/*
+  Content-Security-Policy: frame-ancestors https://teams.microsoft.com https://*.teams.microsoft.com https://outlook.office.com https://*.office.com https://*.cloud.microsoft; script-src 'self'; connect-src 'self' https://login.microsoftonline.com https://*.microsoftonline.com https://teams.microsoft.com https://*.teams.microsoft.com https://*.office.com; object-src 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains

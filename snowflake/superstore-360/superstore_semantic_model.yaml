@@ -1,0 +1,448 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+name: superstore_semantic_model
+description: Comprehensive semantic model for Superstore sales analytics with multi-grain analysis across orders, returns, and regional managers
+tables:
+  - name: orders
+    description: Core sales transaction data with customer, product, location, and financial details
+    base_table:
+      database: SUPERSTORE
+      schema: PUBLIC
+      table: ORDERS_V
+    dimensions:
+      - name: category
+        synonyms:
+          - category
+          - product category
+        description: 'Product category: Furniture, Office Supplies, or Technology'
+        expr: CATEGORY
+        data_type: VARCHAR
+      - name: city
+        synonyms:
+          - city
+          - location
+        description: City where order was shipped
+        expr: CITY
+        data_type: VARCHAR
+      - name: country_region
+        synonyms:
+          - country
+          - country/region
+          - nation
+        description: Country or region
+        expr: COUNTRY_REGION
+        data_type: VARCHAR
+      - name: customer_id
+        synonyms:
+          - client ID
+          - customer ID
+          - customer identifier
+        description: Unique identifier for the customer
+        expr: CUSTOMER_ID
+        data_type: VARCHAR
+      - name: customer_name
+        synonyms:
+          - client name
+          - customer
+          - customer name
+        description: Full name of the customer
+        expr: CUSTOMER_NAME
+        data_type: VARCHAR
+      - name: customer_segment
+        synonyms:
+          - customer segment
+          - customer type
+          - segment
+        description: 'Customer segment: Consumer, Corporate, or Home Office'
+        expr: SEGMENT
+        data_type: VARCHAR
+      - name: delivery_mode
+        synonyms:
+          - delivery method
+          - ship mode
+          - shipping mode
+        description: Shipping/delivery method
+        expr: DELIVERY_MODE
+        data_type: VARCHAR
+      - name: dispatch_date
+        synonyms:
+          - ship date
+          - shipment date
+          - shipping date
+        description: Date when the order was dispatched
+        expr: DISPATCH_DATE
+        data_type: DATE
+      - name: order_date
+        synonyms:
+          - order date
+          - purchase date
+          - sale date
+          - transaction date
+        description: Date when the order was placed by the customer
+        expr: ORDER_DATE
+        data_type: DATE
+      - name: order_id
+        synonyms:
+          - order ID
+          - order identifier
+          - order number
+        description: Unique identifier for the order
+        expr: ORDER_ID
+        data_type: VARCHAR
+        unique: true
+      - name: order_month
+        synonyms:
+          - month
+          - order month
+          - sales month
+        description: Calendar month number (1-12)
+        expr: MONTH(ORDER_DATE)
+        data_type: NUMBER
+      - name: order_quarter
+        synonyms:
+          - fiscal quarter
+          - Q
+          - quarter
+        description: Calendar quarter (1-4)
+        expr: QUARTER(ORDER_DATE)
+        data_type: NUMBER
+      - name: order_year
+        synonyms:
+          - order year
+          - sales year
+          - year
+        description: Calendar year extracted from the order date
+        expr: YEAR(ORDER_DATE)
+        data_type: NUMBER
+      - name: product_id
+        synonyms:
+          - product code
+          - product ID
+          - SKU
+        description: Unique identifier for the product
+        expr: PRODUCT_ID
+        data_type: VARCHAR
+      - name: product_name
+        synonyms:
+          - item name
+          - product
+          - product name
+        description: Full product name
+        expr: PRODUCT_NAME
+        data_type: VARCHAR
+      - name: region
+        synonyms:
+          - region
+          - sales region
+          - territory
+        description: 'Geographic sales region: North, South, or Central'
+        expr: REGION
+        data_type: VARCHAR
+      - name: state_province
+        synonyms:
+          - province
+          - state
+          - state/province
+        description: State or province where order was shipped
+        expr: STATE_PROVINCE
+        data_type: VARCHAR
+      - name: sub_category
+        synonyms:
+          - product subcategory
+          - sub-category
+          - subcategory
+        description: Detailed product subcategory
+        expr: SUB_CATEGORY
+        data_type: VARCHAR
+    facts:
+      - name: average_order_value
+        synonyms:
+          - AOV
+          - avg order value
+        description: Average revenue per order
+        expr: SUM(SALES) / NULLIF(COUNT(*), 0)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: average_profit
+        synonyms:
+          - average profit
+          - avg profit
+        description: Average profit per order
+        expr: AVG(PROFIT)
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: average_sales
+        synonyms:
+          - average revenue
+          - avg sales
+        description: Average revenue per order
+        expr: AVG(SALES)
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: profit_margin
+        synonyms:
+          - margin
+          - profit margin percentage
+          - profitability
+        description: Profit as percentage of sales
+        expr: (SUM(PROFIT) / NULLIF(SUM(SALES), 0)) * 100
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: sales_count
+        synonyms:
+          - number of orders
+          - order count
+          - transaction count
+        description: Total number of orders
+        expr: COUNT(*)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: total_discount
+        synonyms:
+          - discount
+          - total discount
+        description: Total discount amount
+        expr: SUM(DISCOUNT)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: total_profit
+        synonyms:
+          - earnings
+          - profit
+          - total profit
+        description: Total profit across all orders
+        expr: SUM(PROFIT)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: total_quantity
+        synonyms:
+          - quantity sold
+          - total units
+          - units sold
+        description: Total units sold
+        expr: SUM(QUANTITY)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: total_sales
+        synonyms:
+          - gross sales
+          - revenue
+          - sales
+          - total revenue
+        description: Total revenue across all orders
+        expr: SUM(SALES)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: unique_customers
+        synonyms:
+          - customer count
+          - distinct customers
+          - number of customers
+        description: Count of unique customers
+        expr: COUNT(DISTINCT CUSTOMER_ID)
+        data_type: NUMBER
+        default_aggregation: sum
+  - name: people
+    description: Regional sales manager assignments mapping regions to sales personnel
+    base_table:
+      database: SUPERSTORE
+      schema: PUBLIC
+      table: PEOPLE_V
+    dimensions:
+      - name: person_name
+        synonyms:
+          - manager name
+          - regional manager
+          - sales manager
+          - sales rep
+        description: Name of the regional sales manager
+        expr: PERSON_NAME
+        data_type: VARCHAR
+        unique: false
+      - name: region
+        synonyms:
+          - assigned region
+          - manager region
+          - territory
+        description: Sales region assigned to the manager
+        expr: REGION
+        data_type: VARCHAR
+        unique: true
+  - name: returns
+    description: Product return information at order level - tracks which orders had returns
+    base_table:
+      database: SUPERSTORE
+      schema: PUBLIC
+      table: RETURNS_V
+    dimensions:
+      - name: is_returned
+        synonyms:
+          - is returned
+          - return status
+          - returned
+        description: Boolean flag indicating order was returned (always TRUE in returns table)
+        expr: IS_RETURNED
+        data_type: BOOLEAN
+      - name: order_id
+        synonyms:
+          - order with return
+          - return order identifier
+          - returned order ID
+        description: Order ID for returned orders - links to orders table
+        expr: ORDER_ID
+        data_type: VARCHAR
+        unique: true
+    facts:
+      - name: discount_impact_on_profit
+        synonyms:
+          - discount impact %
+          - discount to profit ratio
+          - promotional cost ratio
+        description: Discount amount as percentage of profit
+        expr: (SUM(DISCOUNT) / NULLIF(SUM(PROFIT), 0)) * 100
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: distinct_returned_orders
+        synonyms:
+          - distinct returns
+          - unique return orders
+          - unique returned orders
+        description: Count of distinct orders with returns
+        expr: COUNT(DISTINCT ORDER_ID)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: gross_profit_margin
+        synonyms:
+          - gross margin
+          - gross margin %
+          - gross profitability
+        description: Gross profit margin including discount impact
+        expr: ((SUM(PROFIT) + SUM(DISCOUNT)) / NULLIF(SUM(SALES), 0)) * 100
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: net_revenue
+        synonyms:
+          - actual revenue
+          - net sales
+          - revenue after discount
+        description: Total revenue minus discounts - actual revenue received
+        expr: SUM(SALES) - SUM(DISCOUNT)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: profit_per_unit
+        synonyms:
+          - profit per item
+          - unit profitability
+        description: Average profit per unit sold
+        expr: SUM(PROFIT) / NULLIF(SUM(QUANTITY), 0)
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: return_count
+        synonyms:
+          - number of returns
+          - return count
+          - returned orders
+          - returns
+        description: Count of orders that were returned (order-level grain)
+        expr: COUNT(IS_RETURNED)
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: revenue_per_customer
+        synonyms:
+          - avg customer revenue
+          - CLV
+          - customer lifetime value
+        description: Average revenue per unique customer
+        expr: SUM(SALES) / NULLIF(COUNT(DISTINCT CUSTOMER_ID), 0)
+        data_type: NUMBER
+        default_aggregation: avg
+verified_queries:
+  - name: Total sales and profit by region
+    question: What were the total sales and profit for each region?
+    use_as_onboarding_question: true
+    sql: |
+      SELECT region, SUM(sales) AS total_sales, SUM(profit) AS total_profit 
+      FROM __orders 
+      GROUP BY region 
+      ORDER BY total_sales DESC
+    verified_at: 1731542400
+    verified_by: data_analyst
+  - name: Top performing categories
+    question: Which product categories generate the most revenue?
+    use_as_onboarding_question: true
+    sql: |
+      SELECT category, SUM(sales) AS revenue, AVG((profit / NULLIF(sales, 0)) * 100) AS margin_pct 
+      FROM __orders 
+      GROUP BY category 
+      ORDER BY revenue DESC
+    verified_at: 1731542400
+    verified_by: data_analyst
+  - name: Customer segment performance
+    question: How do customer segments compare in terms of sales and profitability?
+    use_as_onboarding_question: true
+    sql: |
+      SELECT 
+        customer_segment,
+        SUM(sales) AS revenue,
+        COUNT(DISTINCT customer_id) AS customers,
+        (SUM(profit) / NULLIF(SUM(sales), 0)) * 100 AS margin_pct
+      FROM __orders
+      GROUP BY customer_segment
+      ORDER BY revenue DESC
+    verified_at: 1731542400
+    verified_by: data_analyst
+  - name: Returns analysis
+    question: What is the return rate by region?
+    use_as_onboarding_question: true
+    sql: |
+      SELECT o.region, COUNT(DISTINCT r.order_id) AS returned_orders, COUNT(DISTINCT o.order_id) AS total_orders, (CAST(COUNT(DISTINCT r.order_id) AS FLOAT) / NULLIF(COUNT(DISTINCT o.order_id), 0)) * 100 AS return_rate_pct 
+      FROM __orders AS o 
+      LEFT JOIN __returns AS r ON o.order_id = r.order_id AND r.is_returned = TRUE 
+      GROUP BY o.region 
+      ORDER BY return_rate_pct DESC
+    verified_at: 1731542400
+    verified_by: data_analyst
+  - name: Quarterly trends
+    question: Show me quarterly sales trends for 2023
+    use_as_onboarding_question: true
+    sql: |
+      SELECT QUARTER(order_date) AS quarter, SUM(sales) AS revenue, SUM(profit) AS profit, (SUM(profit) / NULLIF(SUM(sales), 0)) * 100 AS margin_pct 
+      FROM __orders 
+      WHERE YEAR(order_date) = 2023 
+      GROUP BY QUARTER(order_date) 
+      ORDER BY quarter
+    verified_at: 1731542400
+    verified_by: data_analyst
+custom_instructions: |
+  You are a specialized sales analytics assistant for Superstore, a retail company.
+
+  IMPORTANT CONTEXT:
+  - The data covers sales from 2020-2023
+  - Customer segments: Consumer (largest), Corporate, Home Office
+  - Product categories: Technology (highest margin), Office Supplies (highest volume), Furniture
+  - Regions: Central (largest), North, South
+  - The RETURNS table is at ORDER level (not line-item level), so it tracks which orders had returns
+
+  ANALYSIS APPROACH:
+  1. Always consider profit margin alongside revenue - higher sales don't always mean better performance
+  2. Look for trends over time - compare YoY, QoQ, MoM when relevant
+  3. Consider the customer segment context - Corporate has different patterns than Consumer
+  4. When analyzing returns, remember they're at order level (284 unique orders, 734 line items)
+  5. Use derived metrics like revenue_per_customer, profit_per_unit for deeper insights
+
+  RESPONSE GUIDELINES:
+  - Format currency with $ and proper thousands separators
+  - Format percentages with % symbol and 2 decimal places
+  - Always provide context - don't just give raw numbers
+  - Suggest related follow-up questions when appropriate
+  - If data is ambiguous or missing, state assumptions clearly
+
+  COMMON PITFALLS TO AVOID:
+  - Don't mix order-level (returns) with line-item level (orders) metrics without explaining
+  - Don't assume correlation equals causation
+  - Always check date ranges to ensure comparisons are valid
+
+  USER GUIDANCE:
+  Ask questions naturally about sales performance, profitability, customer analysis, returns, trends, and comparisons.
+  You can be specific with time periods ("in 2023", "Q2"), locations ("in Central region"), products ("for Technology products"), or customer segments ("Corporate customers").
+  The assistant understands business context and will provide insights, not just raw numbers.

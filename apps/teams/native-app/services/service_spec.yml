@@ -1,0 +1,106 @@
+# Copyright 2026 Snowflake Inc.
+# SPDX-License-Identifier: Apache-2.0
+# SPCS service spec for the Teams SPCS backend, as installed inside the Native App.
+#
+# This file is applied via CONFIG.CREATE_SERVER_SERVICE / ROLL_SERVER_SERVICE
+# (setup/setup.sql) as SPECIFICATION_TEMPLATE_FILE. Consumer-varying secrets stay
+# in the secrets: block; the only template variable is cdn_origin (the tab CDN
+# origin), bound via USING after hostname/origin validation.
+#
+# This is the NETWORK_MODE=public spec. hybrid/privatelink use
+# service_spec_private.yml, which must stay identical apart from its
+# "# private-only" lines (scripts/lint-service-specs.sh checks this).
+spec:
+  containers:
+    - name: agents-teams-app
+      image: /agents_teams_app_db/public/na_image_repo/agents-teams-app:latest
+      env:
+        TEAMS_AUTH_MODE: production
+        ARTIFACTS_INTEGRATION_ENABLED: "true"
+        # Feature flags; each gates one optional capability in the chat UI.
+        FF_FILE_UPLOAD: "true"
+        FF_SKILLS: "true"
+        FF_DEEP_RESEARCH: "true"
+        FF_WEB_SEARCH: "true"
+        # Off by default: date/chart experimental
+        # flags now always go out on :run (see chat-core datePreamble.ts). This flag only
+        # adds the extra undocumented stream fields (enableStepTrace / enableAnalystStreaming /
+        # enableRelatedQueries / responseSchemaVersion v2).
+        FF_NATIVE_STREAM_FLAGS: "false"
+      secrets:
+        - snowflakeSecret:
+            objectName: CONFIG.BOT_APP_ID
+          secretKeyRef: secret_string
+          envVarName: BOT_APP_ID
+        - snowflakeSecret:
+            objectName: CONFIG.BOT_APP_SECRET
+          secretKeyRef: secret_string
+          envVarName: BOT_APP_SECRET
+        - snowflakeSecret:
+            objectName: CONFIG.OBO_CLIENT_ID
+          secretKeyRef: secret_string
+          envVarName: OBO_CLIENT_ID
+        - snowflakeSecret:
+            objectName: CONFIG.OBO_CLIENT_SECRET
+          secretKeyRef: secret_string
+          envVarName: OBO_CLIENT_SECRET
+        - snowflakeSecret:
+            objectName: CONFIG.DEFAULT_AGENT_FQN
+          secretKeyRef: secret_string
+          envVarName: DEFAULT_AGENT_FQN
+        - snowflakeSecret:
+            objectName: CONFIG.TEAMS_APP_ID
+          secretKeyRef: secret_string
+          envVarName: TEAMS_APP_ID
+        - snowflakeSecret:
+            objectName: CONFIG.AGENT_ALLOW_LIST
+          secretKeyRef: secret_string
+          envVarName: AGENT_ALLOW_LIST
+        - snowflakeSecret:
+            objectName: CONFIG.AZURE_TENANT_ID
+          secretKeyRef: secret_string
+          envVarName: AZURE_TENANT_ID
+        - snowflakeSecret:
+            objectName: CONFIG.SNOWFLAKE_SCOPE
+          secretKeyRef: secret_string
+          envVarName: SNOWFLAKE_SCOPE
+        - snowflakeSecret:
+            objectName: CONFIG.APPS_API_HOST
+          secretKeyRef: secret_string
+          envVarName: APPS_API_HOST
+        - snowflakeSecret:
+            objectName: CONFIG.ALLOWED_ORIGINS
+          secretKeyRef: secret_string
+          envVarName: ALLOWED_ORIGINS
+        # Computed at install time by setup.sql (org-account form, not the locator or the
+        # .privatelink host - see SnowflakeHostMode in
+        # packages/cortex-server/src/snowflake/credential.ts).
+        - snowflakeSecret:
+            objectName: CONFIG.SNOWFLAKE_ACCOUNT_NAME
+          secretKeyRef: secret_string
+          envVarName: SNOWFLAKE_ACCOUNT
+      resources:
+        requests:
+          cpu: "0.5"
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+      readinessProbe:
+        port: 3000
+        path: /healthz
+  endpoints:
+    - name: https
+      port: 3000
+      public: true
+      # corsSettings cannot read a secret. CONFIG.CREATE_SERVER_SERVICE /
+      # ROLL_SERVER_SERVICE bind cdn_origin as a JSON array via USING.
+      corsSettings:
+        Access-Control-Allow-Origin: {{ cdn_origin }}
+        Access-Control-Allow-Methods: ["POST", "GET"]
+        Access-Control-Allow-Headers: ["Authorization", "Content-Type", "X-User-Access-Token"]
+# Deliberately NOT in this file: externalAccessIntegrations and minInstances. Both are
+# rejected here as unknown spec options for a Native App's FROM SPECIFICATION - they are
+# CREATE SERVICE clauses instead, which setup/setup.sql's CONFIG.CREATE_SERVER_SERVICE /
+# ROLL_SERVER_SERVICE procedures already supply directly (EXTERNAL_ACCESS_INTEGRATIONS,
+# MIN_INSTANCES).

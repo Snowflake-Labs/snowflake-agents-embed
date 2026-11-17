@@ -1,0 +1,19 @@
+/* Copyright 2026 Snowflake Inc. | SPDX-License-Identifier: Apache-2.0 */
+/* Agents Embed for Teams — tab SPA styles.
+ * Theme-aware via [data-teams-theme] on <html> (set in main.tsx from Teams context).
+ * Accent/font are intentionally pointed at the native Snowflake CoWork app's brand
+ * look rather than Teams' own colors - see
+ * the chat-ui-parity plan.
+ *
+ * Shared tokens/base/layout/chat/composer styles now live in
+ * @snowflake-agents-embed/chat-core/styles (imported from main.tsx). This file carries only
+ * the Teams-specific token overrides that diverge from the shared defaults. */
+
+:root {
+  --user-bubble: #e8ebfa;
+}
+
+html[data-teams-theme="dark"] {
+  --user-bubble: #3b3a6b;
+  --link: #a6c4f7;
+}

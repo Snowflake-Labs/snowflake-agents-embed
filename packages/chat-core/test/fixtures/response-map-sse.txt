@@ -1,0 +1,5 @@
+event: response.map
+data: {"map_spec":"{\"version\":1,\"title\":\"Store Locations\",\"viewState\":{\"latitude\":40.7,\"longitude\":-74,\"zoom\":10},\"layer\":{\"type\":\"latlon\",\"encoding\":{\"latColumn\":\"latitude\",\"lonColumn\":\"longitude\",\"colorColumn\":\"revenue\",\"colorScheme\":\"sequential\"},\"styling\":{\"opacity\":0.8,\"pointRadius\":8}},\"data\":{\"values\":[{\"store\":\"Downtown\",\"latitude\":40.75,\"longitude\":-73.99,\"revenue\":450000}]}}","tool_use_id":"toolu_map_1"}
+
+event: done
+data: [DONE]
