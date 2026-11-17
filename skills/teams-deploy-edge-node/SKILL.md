@@ -35,7 +35,7 @@ The Worker + cloudflared privatelink path was validated on AWS on 2026-10-09, bu
 3. Run hardened, on an encrypted volume:
    `docker run -d --name teams-edge --restart unless-stopped --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp -v teams-edge-data:/data --env-file edge.env -p 8080:8080 agents-teams-edge`
 4. Put a TLS-terminating proxy in front, point `TAB_BASE_HOST` at it, and follow the host cutover in [§ 6](../../docs/install-teams.md#6-pages-to-worker-cutover), skipping the Cloudflare steps.
-5. Verify: `/healthz` returns `ok`, `/config` returns the tab shell, the edge probe returns 401, a tab chat streams, and `stat -c '%a' /data /data/bot-links.sqlite` prints `700` and `600`.
+5. Verify: `/healthz` returns `ok`, `/config` returns the tab shell, the edge probe returns 401, a tab chat streams, and `stat -c '%a' /data /data/bot-links.sqlite` prints `700` and `600`. Also test the bot path: `POST /api/bot/messages` with a junk Bearer token must return 401, and an @mention in a channel or group chat must get a sign-in card (no reply means the bot JWT check rejected Bot Connector; the edge log says why). A 1:1 chat with the bot shows a Teams 404 `Conversation was not found` by design (bot scopes are `team` and `groupChat`).
 
 ## Failures
 

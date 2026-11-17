@@ -239,6 +239,12 @@ export interface BotIdentity {
   oid: string
 }
 
+// Reason only, never the token or headers: a silent 401 hid the iat bug for a whole install.
+function rejectBot(reason: string): null {
+  console.error(`bot request rejected: ${reason}`)
+  return null
+}
+
 /**
  * Verifies the Bot Framework token before trusting `aadObjectId` from the body. The
  * container re-verifies the same token; this check exists so the edge never looks up (or
@@ -255,17 +261,20 @@ export async function verifyBotRequest(
     const { payload } = await jwtVerify(token, botJwks, {
       issuer: BOT_ISSUER,
       audience: appId,
+      // Bot Connector tokens carry exp/nbf but no iat, so maxTokenAge (which requires iat) rejects all of them.
       algorithms: ['RS256'],
-      maxTokenAge: '1h',
     })
     const claimed = payload.serviceurl
-    if (typeof claimed !== 'string' || !claimed) return null
-    if (!activity?.serviceUrl || claimed !== activity.serviceUrl) return null
+    if (typeof claimed !== 'string' || !claimed) return rejectBot('token has no serviceurl claim')
+    if (!activity?.serviceUrl || claimed !== activity.serviceUrl) return rejectBot('serviceurl claim does not match activity')
     const oid = activity?.from?.aadObjectId
     const tid = activity?.channelData?.tenant?.id
-    if (typeof oid !== 'string' || !oid || typeof tid !== 'string' || !tid) return null
+    if (typeof oid !== 'string' || !oid || typeof tid !== 'string' || !tid) {
+      return rejectBot('activity has no from.aadObjectId or channelData.tenant.id')
+    }
     return { tid, oid }
-  } catch {
-    return null
+  } catch (err) {
+    const e = err as { code?: unknown; name?: unknown }
+    return rejectBot(`jwt verification failed: ${String(e?.code ?? e?.name ?? 'unknown')}`)
   }
 }

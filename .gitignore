@@ -16,6 +16,8 @@ edge.env
 *.pfx
 *.cert
 *.crt
+# Browser captures hold live bearer tokens
+*.har
 service_account.json
 credentials.json
 

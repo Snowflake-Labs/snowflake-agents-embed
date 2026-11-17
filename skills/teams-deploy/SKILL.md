@@ -130,13 +130,14 @@ The edge Worker's `SPCS_PAT` user must hold `APP_PUBLIC`, or every `/api/*` call
 
 Full detail: [docs/install-teams.md § 2](../../docs/install-teams.md#2-install-standalone-spcs). Run in order; confirm before each state-changing step and run `SELECT CURRENT_ACCOUNT_NAME()` first.
 
-1. `snow sql -f apps/teams/scripts/bootstrap-dev-spcs.sql` (ACCOUNTADMIN): database, `IMAGE_REPO`, compute pool, EAI, empty secrets, placeholder `CORTEX_TEAMS_OAUTH`, roles, `AGENTS_TEAMS_SVC`.
+1. `snow sql -f apps/teams/scripts/bootstrap-dev-spcs.sql` (ACCOUNTADMIN): database, `IMAGE_REPO`, compute pool, EAI, empty secrets, placeholder `CORTEX_TEAMS_OAUTH`, roles, `AGENTS_TEAMS_SVC`, and `READ` on all 12 CONFIG secrets for SYSADMIN (step 4 needs it; see failures.md I21).
 2. `bash apps/teams/scripts/fill-dev-secrets.sh` (needs `DEFAULT_AGENT_FQN`, `SNOWFLAKE_ENTRA_APP_ID`, `APPS_API_HOST`). It only writes `temp/alter-teams-secrets.sql`, which holds secrets. After the user applies it (`snow sql --silent --enable-templating none -f …`), delete the file.
 3. `bash apps/teams/scripts/push-dev-image.sh` (pushes to `IMAGE_REPO`, not `NA_IMAGE_REPO`; Docker must be up).
 4. Render `apps/teams/scripts/create-dev-service.sql` with `REPLACE_WITH_TAB_BASE_HOST` replaced by `TAB_BASE_HOST` (no scheme) and run it as **SYSADMIN**. The service must be owned by SYSADMIN. For `hybrid`/`privatelink` keep `SNOWFLAKE_HOST_MODE: account`: `internal` (the file's header, the `capabilities` block and the `COMPUTE_POOL` rule SQL) is experimental and returned `395090` in testing (PL8). If you do try `internal`, apply the `COMPUTE_POOL` rule first or every user call fails with `390422`.
 5. Copy `ingress_url` from `SHOW ENDPOINTS IN SERVICE AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS` into `SPCS_INGRESS_HOST` (no scheme) and `SPCS_BASE` (`https://…`). In privatelink, `SPCS_BASE` is `https://<privatelink_ingress_url>` and `SPCS_INGRESS_HOST` is not used.
-6. `bash apps/teams/scripts/set-edge-secrets.sh`, then `bash apps/teams/scripts/deploy-tab.sh` (section 5).
-7. Entra `upn` claim (4a), per-user grants (4b), then section 6 (Teams app).
+6. `bash apps/teams/scripts/set-svc-network-policy.sh --apply` (`public`/`hybrid`; confirm first, it attaches `AGENTS_TEAMS_INGRESS_POLICY` with the Cloudflare ranges to the PAT user). Skipping it gives `390422` on every Worker call, and `smoke-test.sh` now fails without it.
+7. `bash apps/teams/scripts/set-edge-secrets.sh`, then `bash apps/teams/scripts/deploy-tab.sh` (section 5).
+8. Entra token version and `upn` claim (4a), per-user grants (4b), then section 6 (Teams app) and the bot test in section 7.
 
 `deploy-tab.sh` runs `wrangler deploy`, which updates the production Worker in place even from a feature branch. There is no alias lag; re-probe right away.
 
@@ -186,9 +187,9 @@ If Create Service says the app needs `USAGE` on `AGENTS_TEAMS_EAI`:
 GRANT USAGE ON INTEGRATION AGENTS_TEAMS_EAI TO APPLICATION AGENTS_TEAMS_APP;
 ```
 
-## 4a. Entra: `upn` access-token optional claim (both paths)
+## 4a. Entra: token version 2 and `upn` optional claim (both paths)
 
-The Snowflake resource app issues v2 tokens, which carry no `upn` unless the app requests it. Without it Snowflake rejects the token (`Invalid OAuth access token`) and the tab shows `agent_forbidden`. Check:
+The Snowflake resource app must issue v2 tokens, and v2 tokens carry no `upn` unless the app requests it. Without it Snowflake rejects the token (`Invalid OAuth access token`) and the tab shows `agent_forbidden`. Check:
 
 ```bash
 az ad app show --id "$SNOWFLAKE_ENTRA_APP_ID" \
@@ -199,17 +200,25 @@ Expect `v` = `2` and `c` containing `upn`. If not, get user approval (it edits t
 
 ```bash
 az ad app update --id "$SNOWFLAKE_ENTRA_APP_ID" \
+  --requested-access-token-version 2 \
   --optional-claims '{"accessToken":[{"name":"upn","essential":false}]}'
 ```
 
-Only new tokens carry the claim, and the edge session caches the old one: tell the user to reload the tab.
+Set the version with `--requested-access-token-version 2`; `--set api.requestedAccessTokenVersion=2` fails with `Couldn't find 'api'`. Only new tokens carry the claim, and the edge session caches the old one: tell the user to reload the tab.
 
 ## 4b. Per-user identity and grants
 
-One Snowflake user per Entra user. `CORTEX_TEAMS_OAUTH` maps the token's `upn` claim (only) to Snowflake `login_name`; no match is `agent_forbidden` ("You do not have access to that resource"). Cortex resolves permissions from the user's **default** role, so the default role and warehouse must be set. Confirm the account first (`SELECT CURRENT_ACCOUNT_NAME()`), then as `ACCOUNTADMIN`:
+One Snowflake user per Entra user. `CORTEX_TEAMS_OAUTH` maps the token's `upn` claim (only) to Snowflake `login_name`; no match is `agent_forbidden` ("You do not have access to that resource"). Cortex resolves permissions from the user's **default** role, so the default role and warehouse must be set. Confirm the account first (`SELECT CURRENT_ACCOUNT_NAME()`), then as `ACCOUNTADMIN`. Check by **`login_name`**, not only the user name: `CREATE USER IF NOT EXISTS` matches the name, so a user that already has that login under another name makes it fail.
 
 ```sql
-SHOW USERS LIKE '<snowflake_user>';
+SHOW USERS;
+SELECT "name", "login_name", "default_role" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE LOWER("login_name") = LOWER('<entra-upn>');
+```
+
+If a row returns, do not create a user. Grant `AGENTS_TEAMS_USER` to that user's `default_role` (`GRANT ROLE AGENTS_TEAMS_USER TO ROLE <default_role>`, or the object grants below straight to it) and leave their default role alone. Otherwise:
+
+```sql
 CREATE USER IF NOT EXISTS <snowflake_user> LOGIN_NAME = '<entra-upn>'
   DEFAULT_ROLE = AGENTS_TEAMS_USER DEFAULT_WAREHOUSE = <warehouse>;
 GRANT ROLE AGENTS_TEAMS_USER TO USER <snowflake_user>;
@@ -308,6 +317,8 @@ Expect **401** and `{"error":"Unauthorized"}`. That 401 comes from the edge itse
 | 500 / Cloudflare 1101 / banner "Failed to list threads: 500" | Placeholder `SPCS_BASE`. See failures.md I17; inspect with `cd packages/teams-edge && npx wrangler tail <worker>`. |
 | Anything else | [references/failures.md](references/failures.md) |
 
+**Test the bot** (the tab passing does not prove it): have the user @mention the app in a **channel or group chat**. Expect a sign-in card on first use; after they open the personal tab once, the next @mention gets an answer. No reply at all: see failures.md "Bot gets no reply" and tail the Worker for `bot request rejected: <reason>`. A 1:1 chat with the bot shows a Teams 404 `Conversation was not found`; that is expected (bot scopes are `team` and `groupChat`, the personal tab is the 1:1 path), not a failure.
+
 A `200` is not proof. Check the response body: a chat that opens but shows an error banner, or an agent that answers "tool unavailable", is still a failed install.
 
 ### Diagnostics
@@ -319,7 +330,11 @@ snow sql --role SYSADMIN -q "SELECT SYSTEM\$GET_SERVICE_LOGS('AGENTS_TEAMS_APP_D
   | grep -E "Upstream|error|forbidden"
 ```
 
-HAR profiling: extract only method, path, status, timing, response-body error strings and header presence. Never values (HARs hold live bearer tokens). Delete the HAR afterwards.
+Edge Worker (run from `packages/teams-edge`, no `--env`): `npx wrangler tail <worker> --format pretty --search "<text>" --status error`. `--format json` is pretty-printed **multi-line** JSON, so line-based `grep`/`jq` see nothing; parse the whole stream or use `pretty`. Wrangler redacts `Authorization`. Bot Connector's user-agent is `Microsoft-SkypeBotApi`. Bot rejections log `bot request rejected: <reason>` (never token or header values).
+
+HAR profiling: extract only method, path, status, timing, response-body error strings and header presence. Never values (HARs hold live bearer tokens). Tell the user not to paste HARs or request headers into chat, keep captures outside the repo (`*.har` is gitignored), and delete them afterwards.
+
+A single transient `net::ERR_CONNECTION_RESET` on `/api/agent/run` cleared on its own once. If it recurs, record the time and collect the Worker tail and the container log for that minute before changing anything.
 
 ### Automated checks
 

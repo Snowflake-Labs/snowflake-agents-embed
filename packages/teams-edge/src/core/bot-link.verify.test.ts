@@ -30,7 +30,7 @@ describe('verifyBotRequest', () => {
   it('rejects when jwtVerify fails (including a non-RS256 algorithm)', async () => {
     vi.mocked(jwtVerify).mockRejectedValue(new Error('unexpected algorithm "HS256"'))
     expect(await verifyBotRequest(AUTH, 'app', ACTIVITY)).toBeNull()
-    expect(vi.mocked(jwtVerify).mock.calls[0][2]).toMatchObject({ algorithms: ['RS256'], maxTokenAge: '1h' })
+    expect(vi.mocked(jwtVerify).mock.calls[0][2]).toMatchObject({ algorithms: ['RS256'] })
   })
 
   it('returns the activity identity when serviceurl matches', async () => {

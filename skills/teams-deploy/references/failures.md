@@ -44,15 +44,41 @@ Cause: the Worker secret `SPCS_BASE` is a placeholder, so `new Request(upstream)
 
 Transient Wrangler network error. Retry; if persistent, `cd packages/teams-edge && npx wrangler whoami`.
 
+### I21 — `CREATE SERVICE`: `Secret ... does not exist or not authorized`
+
+Cause: `create-dev-service.sql` runs as SYSADMIN, which needs `READ` on all 12 secrets in `AGENTS_TEAMS_APP_DB.CONFIG`; an older bootstrap did not grant it. Fix (ACCOUNTADMIN): re-run `bootstrap-dev-spcs.sql` (idempotent), or `GRANT READ ON SECRET AGENTS_TEAMS_APP_DB.CONFIG.<name> TO ROLE SYSADMIN` for each, then re-run the rendered `create-dev-service.sql`. See [install-teams.md I21](../../../docs/install-teams.md#i21-create-service-secret--does-not-exist-or-not-authorized).
+
 ### Diagnostics — Need the real edge Worker exception
 
 ```bash
 cd packages/teams-edge
-npx wrangler tail <worker>                  # no --env, even in privatelink
+npx wrangler tail <worker> --format pretty --search "<text>" --status error   # no --env, even in privatelink
 npx wrangler secret list --name <worker>    # names only; expect ten
 ```
 
-Then reproduce the failing request. Dashboard: Workers & Pages → the Worker → Logs; secrets under Settings → Variables and Secrets. macOS has no `timeout`; stop with Ctrl-C. Never paste HAR/header captures: they contain live bearer tokens and edge sessions.
+Then reproduce the failing request. Dashboard: Workers & Pages → the Worker → Logs; secrets under Settings → Variables and Secrets. macOS has no `timeout`; stop with Ctrl-C.
+
+- `--format json` is pretty-printed multi-line JSON, so line-based `grep`/`jq` miss it; use `pretty`, or parse the whole stream.
+- Wrangler redacts `Authorization`. Bot Connector calls carry the user-agent `Microsoft-SkypeBotApi`; bot rejections log `bot request rejected: <reason>`.
+- Never paste HAR/header captures into chat: they contain live bearer tokens and edge sessions. Keep captures outside the repo (`*.har` is gitignored) and delete them afterwards.
+- A single `net::ERR_CONNECTION_RESET` on `/api/agent/run` was transient once. If it recurs, note the time and collect the Worker tail and container log for that minute before changing anything.
+
+### Bot gets no reply
+
+Symptom: @mention in a channel or group chat gets no answer and no sign-in card. Probe: `npx wrangler tail <worker> --format pretty --search "bot request rejected"`, then @mention again. The reason says which check failed:
+
+| Log reason | Meaning / fix |
+| --- | --- |
+| `jwt verification failed: <code>` | Wrong `BOT_APP_ID` (audience), wrong issuer, expired token or JWKS fetch failure. Fix `BOT_APP_ID`, `set-edge-secrets.sh`, `deploy-tab.sh` |
+| `token has no serviceurl claim` / `serviceurl claim does not match activity` | Not a genuine Bot Connector call; do not loosen the check |
+| `activity has no from.aadObjectId or channelData.tenant.id` | Not a Teams-user activity; expected for non-Teams senders |
+| `missing or malformed Bearer token` | Unauthenticated probe (expected 401) |
+
+No `bot request rejected` line at all: the messaging endpoint is wrong (`bash apps/teams/scripts/set-bot-endpoint.sh`) or the Teams channel on the Bot Service is disabled (`create-bot.sh`). Bot Connector tokens have no `iat`; the edge must not set `maxTokenAge`.
+
+### 1:1 chat with the bot: Teams 404 `Conversation was not found` (expected)
+
+Not a failure. The manifest's bot scopes are `team` and `groupChat`, so there is no personal bot conversation. Test by @mentioning the app in a channel or group chat; the personal tab is the 1:1 surface.
 
 ---
 
@@ -145,7 +171,15 @@ WHERE deleted_on IS NULL AND LOWER(login_name) = LOWER('<entra-upn>');   -- no r
 DESC SECURITY INTEGRATION CORTEX_TEAMS_OAUTH;   -- EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM should be ('upn')
 ```
 
-**Fix (cause 2).**
+**Fix (cause 2).** First check for a user that already has that `login_name` (`CREATE USER IF NOT EXISTS` matches the user name, not the login):
+
+```sql
+SHOW USERS;
+SELECT "name", "default_role" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE LOWER("login_name") = LOWER('<entra-upn>');
+```
+
+If a row returns, do not create a user: grant `AGENTS_TEAMS_USER` to that user's `default_role` and skip the `CREATE USER` below. Otherwise:
 
 ```sql
 CREATE USER IF NOT EXISTS <snowflake_user> LOGIN_NAME = '<entra-upn>'
@@ -177,10 +211,11 @@ Expect `v` = `2` and `c` containing `upn`.
 **Fix** (needs user approval; edits tenant config):
 
 ```bash
-az ad app update --id "$SNOWFLAKE_ENTRA_APP_ID" --optional-claims '{"accessToken":[{"name":"upn","essential":false}]}'
+az ad app update --id "$SNOWFLAKE_ENTRA_APP_ID" --requested-access-token-version 2 \
+  --optional-claims '{"accessToken":[{"name":"upn","essential":false}]}'
 ```
 
-Then reload the tab: the edge session caches the old token.
+Use `--requested-access-token-version 2`; `--set api.requestedAccessTokenVersion=2` fails with `Couldn't find 'api'`. Then reload the tab: the edge session caches the old token.
 
 ---
 
@@ -273,7 +308,7 @@ The tokenless 401 is the edge's own: with no `X-Edge-Session` it returns before 
 
 **Cause.** The edge Worker authenticates to ingress with `SPCS_PAT`. Snowflake evaluates that **PAT user's** network policy against the Cloudflare egress IP. The managed account policy is not the lever. In `privatelink` the PAT user's policy is `AGENTS_TEAMS_PL_INGRESS_POLICY` (private endpoint IDs), which replaces this one; a Cloudflare IP there means the edge was deployed without `--privatelink` or `SPCS_BASE` still points at the public ingress ([PL3](../../../docs/install-teams.md#pl3-the-private-ingress-rejects-the-edge-401-or-403)).
 
-**Fix.** Run `bash apps/teams/scripts/set-svc-network-policy.sh [-c <conn>] [--apply]` (dry run by default; skips a user that already has another user-level policy unless `--replace`). `smoke-test.sh` flags a PAT user without its own policy. The manual equivalent: give the PAT user a user-level policy that allows Cloudflare egress. Use the published ranges (<https://www.cloudflare.com/ips-v4>) in a dedicated policy; do not use `0.0.0.0/0`. Do **not** edit `ACCOUNT_VPN_POLICY_SE` and do **not** add Cloudflare ranges to the account policy.
+**Fix.** Run `bash apps/teams/scripts/set-svc-network-policy.sh [-c <conn>] [--apply]` (dry run by default; skips a user that already has another user-level policy unless `--replace`). This is an explicit install step ([install-teams.md 5a](../../../docs/install-teams.md)), not optional: `smoke-test.sh` now fails without it. The manual equivalent: give the PAT user a user-level policy that allows Cloudflare egress. Use the published ranges (<https://www.cloudflare.com/ips-v4>) in a dedicated policy; do not use `0.0.0.0/0`. Do **not** edit `ACCOUNT_VPN_POLICY_SE` and do **not** add Cloudflare ranges to the account policy.
 
 ```sql
 CREATE NETWORK POLICY IF NOT EXISTS AGENTS_TEAMS_INGRESS_POLICY

@@ -65,7 +65,7 @@ if command -v snow >/dev/null; then
     case "$POL" in
       USER\ ?*) ok "PAT user ${PAT_USER} has its own network policy (${POL#USER })" ;;
       "") skip "could not read the network policy of ${PAT_USER} (privileges?)" ;;
-      *) skip "PAT user ${PAT_USER} has no user-level policy; if calls fail with 390422 'IP/Token ... not allowed', run set-svc-network-policy.sh" ;;
+      *) fail "PAT user ${PAT_USER} has no user-level network policy, so Cloudflare egress is blocked by any account policy (390422 'IP/Token ... not allowed'); run set-svc-network-policy.sh --apply" ;;
     esac
   else
     skip "SNOWFLAKE_USER not set: PAT user network policy not checked"
@@ -80,6 +80,16 @@ if command -v az >/dev/null && [[ -n "$OBO_CLIENT_ID" ]]; then
   if [[ -z "$URIS" ]]; then skip "az not logged in or app not readable"
   elif grep -qx "api://${HOST}/${OBO_CLIENT_ID}" <<<"$URIS"; then ok "identifier URI api://${HOST}/${OBO_CLIENT_ID}"
   else fail "Entra identifier URIs do not include api://${HOST}/${OBO_CLIENT_ID}"; fi
+  SNOW_APP="$(envval SNOWFLAKE_ENTRA_APP_ID)"
+  if [[ -n "$SNOW_APP" ]]; then
+    TV="$(az ad app show --id "$SNOW_APP" --query 'api.requestedAccessTokenVersion' -o tsv 2>/dev/null || true)"
+    UPN="$(az ad app show --id "$SNOW_APP" --query 'optionalClaims.accessToken[].name' -o tsv 2>/dev/null || true)"
+    if [[ -z "$TV" ]]; then skip "could not read the Snowflake Entra app token version"
+    elif [[ "$TV" == 2 ]]; then ok "Snowflake Entra app issues v2 tokens"
+    else fail "Snowflake Entra app requestedAccessTokenVersion is ${TV}, expected 2 (az ad app update --id ${SNOW_APP} --requested-access-token-version 2)"; fi
+    grep -qx upn <<<"$UPN" && ok "Snowflake Entra app has the upn optional claim" \
+      || fail "Snowflake Entra app lacks the upn optional claim (install-teams.md step 6a)"
+  fi
 else
   skip "az not available: identifier URI not checked"
 fi
@@ -103,6 +113,9 @@ if command -v az >/dev/null && [[ -n "$BOT_APP_ID" ]]; then
 else
   skip "az not available: bot not checked"
 fi
+code="$(status -X POST "https://${HOST}/api/bot/messages" -H 'Content-Type: application/json' -H 'Authorization: Bearer aaa.bbb.ccc' -d '{}')"
+[[ "$code" == 401 ]] && ok "POST /api/bot/messages with a junk token -> 401 (route reachable)" || fail "POST /api/bot/messages expected 401, got ${code}"
+skip "real Bot Connector JWT path is not testable here: @mention the app in a channel or group chat and expect a sign-in card (a Worker 401 in wrangler tail means verification is failing)"
 
 echo "Manifest"
 ZIP="${REPO_ROOT}/packages/teams-manifest/agents-teams-app.zip"

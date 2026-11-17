@@ -136,7 +136,7 @@ docker tag agents-teams-app:latest <IMAGE_REPO>/agents-teams-app:latest
 docker push <IMAGE_REPO>/agents-teams-app:latest
 ```
 
-**5. Create the service** as **SYSADMIN** (not ACCOUNTADMIN). The GRANT statements below only work after this exists. In [`apps/teams/scripts/create-dev-service.sql`](../apps/teams/scripts/create-dev-service.sql) replace `REPLACE_WITH_TAB_BASE_HOST` with `TAB_BASE_HOST` (no scheme), then:
+**5. Create the service** as **SYSADMIN** (not ACCOUNTADMIN). SYSADMIN needs `READ` on all 12 `AGENTS_TEAMS_APP_DB.CONFIG` secrets; the bootstrap grants it. An account bootstrapped before that grant existed fails with [I21](#i21-create-service-secret--does-not-exist-or-not-authorized). The GRANT statements below only work after this exists. In [`apps/teams/scripts/create-dev-service.sql`](../apps/teams/scripts/create-dev-service.sql) replace `REPLACE_WITH_TAB_BASE_HOST` with `TAB_BASE_HOST` (no scheme), then:
 
 ```bash
 snow sql -f apps/teams/scripts/create-dev-service.sql
@@ -148,25 +148,44 @@ That file also grants `ALL_ENDPOINTS_USAGE` and runs `SHOW ENDPOINTS`. zsh treat
 
 Copy `ingress_url` into `apps/teams/.env` `SPCS_INGRESS_HOST` (no scheme) and `SPCS_BASE` (`https://…`) before [§ 3](#3-teams-app) `zip.sh`. In `privatelink`, `SPCS_BASE` is `https://` plus `privatelink_ingress_url` instead. Leaving the `.env.example` placeholder here makes every `/api/*` call 500 later ([I17](#i17-every-api-call-is-500-cloudflare-1101)).
 
+**5a. Allow Cloudflare to reach the ingress** (`public` and `hybrid`). Once the service exists and `SNOWFLAKE_USER` in `apps/teams/.env` names the PAT user, attach the Cloudflare-range policy to that user. Without it every Worker call fails with `390422` ([T7](#t7-cloudflare-ip-is-not-allowed-to-access-snowflake)), and `smoke-test.sh` now fails on a PAT user with no user-level policy.
+
+```bash
+bash apps/teams/scripts/set-svc-network-policy.sh --apply
+```
+
 **6.** [`apps/teams/scripts/deploy-spcs.sh`](../apps/teams/scripts/deploy-spcs.sh) — use the [`teams-deploy-spcs`](../.claude/skills/teams-deploy-spcs/SKILL.md) skill. Builds, pushes, and rolls **standalone** `AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS`. The service must already exist (step 5).
 
 ```bash
 bash apps/teams/scripts/deploy-spcs.sh
 ```
 
-**6a. Add the `upn` optional claim to the Snowflake resource app.** The resource app issues v2 tokens, which carry no `upn` unless requested. Without it Snowflake rejects the token (`Invalid OAuth access token`) and the tab shows `agent_forbidden` ([T9](#t9-you-do-not-have-access-to-that-resource)). Check, then fix if needed (this edits tenant config):
+**6a. Set token version 2 and add the `upn` optional claim on the Snowflake resource app.** The resource app must issue v2 tokens, and v2 tokens carry no `upn` unless requested. Without it Snowflake rejects the token (`Invalid OAuth access token`) and the tab shows `agent_forbidden` ([T9](#t9-you-do-not-have-access-to-that-resource)). Check, then fix if needed (this edits tenant config):
 
 ```bash
 az ad app show --id "$SNOWFLAKE_ENTRA_APP_ID" \
   --query "{v:api.requestedAccessTokenVersion, c:optionalClaims.accessToken[].name}"   # expect 2 and ["upn"]
 
 az ad app update --id "$SNOWFLAKE_ENTRA_APP_ID" \
+  --requested-access-token-version 2 \
   --optional-claims '{"accessToken":[{"name":"upn","essential":false}]}'
 ```
+
+Use `--requested-access-token-version 2`. `--set api.requestedAccessTokenVersion=2` fails with `Couldn't find 'api'`. `smoke-test.sh` checks both values.
 
 Only new tokens carry the claim; reload the tab afterwards.
 
 **7. Give each Teams user a Snowflake identity and the agent's grants.** The per-user token is checked against `CORTEX_TEAMS_OAUTH`, which maps the Entra `upn` claim (only; `email` and `preferred_username` are user-editable and not accepted) to a Snowflake `login_name`. No matching user means `agent_forbidden` ([T9](#t9-you-do-not-have-access-to-that-resource)). A user without the agent's grants gets a chat that works but tools that are "not available" ([T10](#t10-the-agent-says-a-tool-is-unavailable)). Run this once per Entra user, as `ACCOUNTADMIN`:
+
+First check whether the person already has a Snowflake user under another name. `CREATE USER IF NOT EXISTS` only matches the user **name**, so an existing user with the same `login_name` makes it fail:
+
+```sql
+SHOW USERS;
+SELECT "name", "login_name", "default_role" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE LOWER("login_name") = LOWER('<entra-upn>');
+```
+
+If a row comes back, do **not** create a user. Use that user's `default_role` as the role to grant to: `GRANT ROLE AGENTS_TEAMS_USER TO ROLE <default_role>` (or the object grants below directly to it), and leave their `DEFAULT_ROLE` alone. Otherwise create one:
 
 ```sql
 SELECT CURRENT_ACCOUNT_NAME();   -- must be the account that hosts the SPCS ingress
@@ -183,7 +202,7 @@ GRANT USAGE ON SCHEMA <db>.<schema> TO ROLE AGENTS_TEAMS_USER;
 GRANT USAGE ON AGENT <db>.<schema>.<agent> TO ROLE AGENTS_TEAMS_USER;
 ```
 
-Cortex Agents resolve permissions from the user's **default** role, so the role above must be `DEFAULT_ROLE`. The tool grants depend on the agent: semantic view and the tables it reads, Cortex Search services, functions, and the warehouse. Grant the Teams role each object the agent uses.
+Cortex Agents resolve permissions from the user's **default** role, so the role above must be `DEFAULT_ROLE` (for a pre-existing user, the grants must reach their existing default role). The tool grants depend on the agent: semantic view and the tables it reads, Cortex Search services, functions, and the warehouse. Grant the Teams role each object the agent uses.
 
 **8.** Edge secrets, then the tab. [`apps/teams/scripts/set-edge-secrets.sh`](../apps/teams/scripts/set-edge-secrets.sh) puts `AZURE_TENANT_ID`, `OBO_*`, `SNOWFLAKE_SCOPE` (`api://<SNOWFLAKE_ENTRA_APP_ID>/session:role-any`), `ENTRA_AUDIENCE_URI` (`api://<TAB_BASE_HOST>/<OBO_CLIENT_ID>`), `SPCS_BASE`, `SPCS_PAT`, `EDGE_SESSION_SECRET`, `BOT_LINK_SECRET` and `BOT_APP_ID` on the Worker in one `wrangler secret bulk`. It does not deploy. [`deploy-tab.sh`](../apps/teams/scripts/deploy-tab.sh) builds the tab and runs `wrangler deploy` from `packages/teams-edge`; it does **not** put secrets, so run it after every secret change. The first `wrangler deploy` creates the Worker. (`set-pages-secrets.sh` still works: it is a shim that runs `set-edge-secrets.sh`.) Missing `AZURE_TENANT_ID` / `OBO_*` / `SNOWFLAKE_SCOPE` is `POST /token/exchange` 500 `Edge misconfigured`. A Teams SSO token whose `aud` is the App ID URI (not the GUID) is `401 ERR_JWT_CLAIM_VALIDATION_FAILED` until `ENTRA_AUDIENCE_URI` is set. Continue at [§ 3](#3-teams-app).
 
@@ -252,12 +271,13 @@ bash apps/teams/scripts/deploy-tab.sh            # privatelink: deploy-tab.sh --
 
    `zip.sh` runs `generate.mjs`, which writes a gitignored `manifest.json` from `apps/teams/.env` (`TEAMS_APP_ID`, `BOT_APP_ID`, `TAB_BASE_HOST`, `SPCS_INGRESS_HOST`). Update `SPCS_INGRESS_HOST` first (`SHOW ENDPOINTS IN SERVICE AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS`). A leftover hostname from a previous install will not match the new ingress. With `NETWORK_MODE=privatelink` in `apps/teams/.env`, `generate.mjs` leaves `SPCS_INGRESS_HOST` out of `validDomains` (Teams never loads the private ingress) and does not need it.
 3. Open the **personal tab**. Teams SSO → Entra JWT → edge `/token/exchange` (OBO) → Snowflake-audience token → same-origin `/api/*`. Hard-refresh Teams (Cmd+Shift+R) after a sideload.
+4. **Test the bot.** The tab passing does not prove the bot works: the bot path has its own JWT check at the edge. In a **channel or group chat** that has the app, @mention it (for example `@Snowflake Agent (Unofficial) revenue in 2023`). A user who has not linked yet gets a **sign-in card**; open the personal tab once, then @mention again to get an answer. No reply at all is [T13](#t13-the-bot-gets-no-reply). A 1:1 chat with the bot shows a Teams 404 `Conversation was not found`: that is expected ([T14](#t14-1-1-chat-with-the-bot-shows-conversation-was-not-found)).
 
 ---
 
 ## 4. Verify and common failures
 
-Open the personal tab, complete SSO, confirm the agent list loads, ask a question, confirm the answer **streams** (thinking steps / tokens arriving over time), not a single dump after 20s.
+Open the personal tab, complete SSO, confirm the agent list loads, ask a question, confirm the answer **streams** (thinking steps / tokens arriving over time), not a single dump after 20s. Then @mention the app in a channel or group chat and confirm it replies (sign-in card on first use; [§ 3](#3-teams-app) step 4).
 
 Edge probe without a session (expects `401 {"error":"Unauthorized"}`):
 
@@ -280,8 +300,8 @@ So the probe above gets the edge's own `401`, and scripts that omit `Origin` or 
 
 Errors are grouped by when you hit them, and numbered in the order you usually see them:
 
-- [4.1 During install: script and deploy errors](#41-during-install-script-and-deploy-errors) (**I1 to I20**): a script, deploy or SQL step fails before you can open the tab.
-- [4.2 After install: errors in the tab](#42-after-install-errors-in-the-tab) (**T1 to T12**): the tab loads, but sign-in, the agent list or a chat fails.
+- [4.1 During install: script and deploy errors](#41-during-install-script-and-deploy-errors) (**I1 to I21**): a script, deploy or SQL step fails before you can open the tab.
+- [4.2 After install: errors in the tab](#42-after-install-errors-in-the-tab) (**T1 to T14**): the tab loads, but sign-in, the agent list or a chat fails.
 - [4.3 Diagnostics (not errors)](#43-diagnostics-not-errors): how to see the real error when the cause is not obvious
 - [7.7 Private connectivity failures](#77-private-connectivity-failures) (**PL1 to PL6**): only in `hybrid` and `privatelink`
 
@@ -495,6 +515,20 @@ Paste the `token_secret` into `SNOWFLAKE_PAT=` in `apps/teams/.env` (no whitespa
 
 **Fix.** `bash apps/teams/scripts/create-bot.sh` shows whether the bot exists and the Teams channel is on; add `--apply` to create what is missing. `smoke-test.sh` has a Bot check. If you only want the tab, build a tab-only package instead of a bot.
 
+#### I21. `CREATE SERVICE`: Secret ... does not exist or not authorized
+
+**Symptom.** `create-dev-service.sql` fails as SYSADMIN with `Secret 'AGENTS_TEAMS_APP_DB.CONFIG.<NAME>' does not exist or not authorized`, although the secret exists.
+
+**Cause.** `CREATE SERVICE` checks that the owner role can read every secret the spec references, and SYSADMIN had no `READ` on them. The bootstrap now grants `READ` on all 12 secrets to SYSADMIN; an account bootstrapped before that was added lacks the grants.
+
+**Fix.** Re-run the bootstrap (it is idempotent), or grant by hand as ACCOUNTADMIN for each of the 12 secrets, then re-run `create-dev-service.sql`:
+
+```sql
+GRANT READ ON SECRET AGENTS_TEAMS_APP_DB.CONFIG.<SECRET_NAME> TO ROLE SYSADMIN;
+```
+
+**Verify.** `SHOW GRANTS ON SECRET AGENTS_TEAMS_APP_DB.CONFIG.BOT_APP_ID` lists `READ` for `SYSADMIN`.
+
 ### 4.2 After install: errors in the tab
 
 The tab is reachable, but something fails once a user signs in or chats. A fresh install into a new Snowflake account tends to hit T1 to T10 one after another. Each hides the next, so fix them in order.
@@ -613,6 +647,8 @@ SHOW USER PROGRAMMATIC ACCESS TOKENS FOR USER "<pat-user>";   -- use the ACTIVE 
 
 Calling the **ingress** directly with no PAT also returns `302`. That is expected; the edge must attach the PAT, and the ingress is never the bot endpoint.
 
+A single `net::ERR_CONNECTION_RESET` on `/api/agent/run` was seen once and cleared with no change. If it recurs, capture the time and gather both sides before changing anything: `wrangler tail` for the Worker ([Seeing the actual edge Worker error](#seeing-the-actual-edge-worker-error)) and the SPCS container log ([Reading the SPCS container log](#reading-the-spcs-container-log)) for the same minute.
+
 **Verify.** The edge probe returns `401 {"error":"Unauthorized"}`. In the tab, `GET /api/agents` and `GET /api/threads` are 200 and the agent list loads.
 
 #### T7. Cloudflare IP is not allowed to access Snowflake
@@ -623,7 +659,7 @@ Calling the **ingress** directly with no PAT also returns `302`. That is expecte
 
 **Cause.** The edge Worker reaches the ingress with `SPCS_PAT`, so Snowflake checks the **PAT user's** network policy against a Cloudflare edge IP. The account policy has no Cloudflare ranges. The managed account policy is not the lever: do not edit `ACCOUNT_VPN_POLICY_SE` and do not add Cloudflare ranges to the account policy.
 
-**Fix.** Run the script. It prints the SQL by default and runs it with `--apply`; it leaves a user that already has a different user-level policy alone unless `--replace`, and never touches account-level policies:
+**Fix.** This is install step 5a; run it if it was skipped. The script prints the SQL by default and runs it with `--apply`; it leaves a user that already has a different user-level policy alone unless `--replace`, and never touches account-level policies:
 
 ```bash
 bash apps/teams/scripts/set-svc-network-policy.sh [-c <snow connection>]            # dry run
@@ -683,10 +719,12 @@ In `hybrid` and `privatelink` the internal route is intentional (`SNOWFLAKE_HOST
 1. **No Snowflake user for the Entra identity.** No user has a `login_name` equal to the token's `upn`.
 2. **Token has no `upn` claim.** The log shows `Upstream 401: Invalid OAuth access token`. Entra v2 access tokens omit `upn` unless it is added as an optional claim ([install step 6a](#2-install-standalone-spcs)).
 
-**Fix.** For cause 1, create the user ([install step 7](#2-install-standalone-spcs) grants), using the Entra UPN as `login_name`. Ask the user for the UPN; do not guess it.
+**Fix.** For cause 1, create the user ([install step 7](#2-install-standalone-spcs) grants), using the Entra UPN as `login_name`. Ask the user for the UPN; do not guess it. Check by `login_name` first: if a user already has that login under another name, do not create one, and grant `AGENTS_TEAMS_USER` access to that user's default role instead (install step 7).
 
 ```sql
-SHOW USERS LIKE '<snowflake_user>';
+SHOW USERS;
+SELECT "name", "login_name", "default_role" FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE LOWER("login_name") = LOWER('<entra-upn>');
 CREATE USER IF NOT EXISTS <snowflake_user> LOGIN_NAME = '<entra-upn>'
   DEFAULT_ROLE = AGENTS_TEAMS_USER DEFAULT_WAREHOUSE = <warehouse>;
 GRANT ROLE AGENTS_TEAMS_USER TO USER <snowflake_user>;
@@ -732,6 +770,32 @@ SHOW GRANTS TO ROLE AGENTS_TEAMS_USER;
 
 **Fix.** Wait for `Retry-After`, fix the underlying 401/403, reload the tab.
 
+#### T13. The bot gets no reply
+
+**Symptom.** You @mention the app in a channel or group chat and nothing comes back: no answer and no sign-in card. The tab works.
+
+**Cause.** Bot Connector calls `POST /api/bot/messages` and the edge answers `401` before any bot logic runs, so Teams shows nothing. Since this install the Worker logs the reason as `bot request rejected: <reason>`. Known reasons:
+
+| Log line                                                            | Cause                                                                                                                                              |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jwt verification failed: ERR_JWT_CLAIM_VALIDATION_FAILED`          | Wrong audience or issuer (`BOT_APP_ID` Worker secret is not the bot's app id), or an age check. Real Bot Connector tokens have `exp`/`nbf` but **no `iat`**, so a `maxTokenAge` option in `jwtVerify` rejects every one of them; the verify code must not set it. |
+| `jwt verification failed: ERR_JWT_EXPIRED`                          | Clock skew or a replayed token.                                                                                                                    |
+| `serviceurl claim does not match activity`                          | The activity `serviceUrl` differs from the token claim: not a real Bot Connector call.                                                            |
+| `activity has no from.aadObjectId or channelData.tenant.id`         | The activity carries no Entra identity (a conversation type or client that does not send it).                                                      |
+| `missing or malformed Bearer token`                                 | The request did not come from Bot Connector (a probe, or the messaging endpoint points at the wrong host).                                         |
+
+**Fix.** Watch the edge while you @mention again ([Seeing the actual edge Worker error](#seeing-the-actual-edge-worker-error)): `npx wrangler tail <worker-name> --format pretty --search "bot request rejected"`. No request at all means the messaging endpoint is wrong (`set-bot-endpoint.sh`) or the Teams channel is off (`create-bot.sh`). A `5xx` is [T6](#t6-api-fails-at-the-edge-or-the-ingress). Fix the cause in the table, `deploy-tab.sh`, and retry.
+
+**Verify.** The @mention returns a sign-in card (or an answer once linked).
+
+#### T14. 1:1 chat with the bot shows "Conversation was not found"
+
+**Symptom.** Messaging the app from its 1:1 (personal) chat shows a Teams 404 `Conversation was not found`.
+
+**Cause.** By design. The manifest bot scopes are `team` and `groupChat` only, not `personal`, so Teams has no personal conversation to deliver to. Per-user chat is the personal tab.
+
+**Fix.** None needed. Use the personal tab for 1:1, or @mention the app in a channel or group chat.
+
 ### 4.3 Diagnostics (not errors)
 
 #### Reading the SPCS container log
@@ -745,7 +809,7 @@ snow sql --role SYSADMIN -q "SELECT SYSTEM\$GET_SERVICE_LOGS('AGENTS_TEAMS_APP_D
 
 #### Profiling a HAR without leaking tokens
 
-A HAR export contains live bearer tokens and edge sessions. Extract metadata only: method, path, status, timing, response-body error strings, and whether a header is present (never its value). Do not paste the HAR or raw headers anywhere, and delete it when done. Repeated `/token/exchange` calls followed by 429 point to [T12](#t12-429-too-many-requests-on-tokenexchange); 403 `Forbidden origin` on GETs points to [T11](#t11-forbidden-origin-on-api).
+A HAR export contains live bearer tokens and edge sessions. Extract metadata only: method, path, status, timing, response-body error strings, and whether a header is present (never its value). Do not paste the HAR or raw headers into chat, tickets or the repo (`*.har` is gitignored, but keep captures outside the repo anyway), and delete it when done. Repeated `/token/exchange` calls followed by 429 point to [T12](#t12-429-too-many-requests-on-tokenexchange); 403 `Forbidden origin` on GETs points to [T11](#t11-forbidden-origin-on-api).
 
 #### Seeing the actual edge Worker error
 
@@ -760,6 +824,13 @@ npx wrangler secret list --name <worker-name>
 ```
 
 Then reproduce the failing request in the tab. Do not pass `--env privatelink` to `tail` or `secret` commands: for those, Wrangler targets `<worker-name>-privatelink`, a Worker that does not exist. Only `deploy-tab.sh` passes `--env`, and it pins `--name` as well. In the dashboard the same view is **Workers & Pages** → the Worker → **Logs**, and secrets are under **Settings** → **Variables and Secrets**.
+
+Reading `tail` output:
+
+- `--format json` prints pretty-printed **multi-line** JSON, so line-based filters (`grep`, `jq -c` per line) see nothing. Parse the whole stream with a JSON parser, or use `--format pretty`.
+- Narrow the stream with `--search "<text>"` (matches log text) and `--status error` (failed invocations only).
+- Wrangler redacts the `Authorization` header, so a bot call's token never shows. Bot Connector requests are recognisable by user-agent `Microsoft-SkypeBotApi`.
+- The edge logs bot rejections as `bot request rejected: <reason>` ([T13](#t13-the-bot-gets-no-reply)); it never logs token or header values.
 
 macOS notes: there is no `timeout` command, so stop `tail` with Ctrl-C. In zsh always replace `<...>` placeholders (unquoted angle brackets are redirects).
 

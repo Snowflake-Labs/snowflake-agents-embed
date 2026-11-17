@@ -109,6 +109,7 @@ export async function handleApi(
     // Bot Framework calls carry no Origin; the container fully verifies the JWT.
     const authorization = request.headers.get('Authorization') ?? ''
     if (!/^Bearer [\w-]+\.[\w-]+\.[\w-]*$/.test(authorization)) {
+      console.error('bot request rejected: missing or malformed Bearer token')
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const kv = env.BOT_LINKS

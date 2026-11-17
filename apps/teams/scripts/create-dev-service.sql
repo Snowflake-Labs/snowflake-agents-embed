@@ -3,6 +3,8 @@
 -- Path A: create standalone AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS (SYSADMIN).
 -- install-teams.md step 5. Run after bootstrap-dev-spcs.sql, secrets, and a
 -- linux/amd64 :latest push to IMAGE_REPO. ACCOUNTADMIN must not own this service.
+-- SYSADMIN needs READ on all 12 AGENTS_TEAMS_APP_DB.CONFIG secrets (granted by
+-- bootstrap-dev-spcs.sql); without it CREATE SERVICE says "Secret ... does not exist or not authorized".
 --
 -- Replace REPLACE_WITH_TAB_BASE_HOST with TAB_BASE_HOST (no scheme), e.g.
 -- teams.example.com (the edge Worker host). Then:
