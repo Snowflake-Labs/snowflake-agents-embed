@@ -1,10 +1,14 @@
 # Copyright 2026 Snowflake Inc.
 # SPDX-License-Identifier: Apache-2.0
+#
+# Paused (open-pull-requests-limit: 0) while this repo stages in Snowflake-Solutions.
+# Remove the limits when the repo moves to Snowflake-Labs.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: "/"
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0
     groups:
       dev-tooling:
         dependency-type: development
@@ -15,6 +19,8 @@ updates:
   - package-ecosystem: docker
     directory: "/apps/teams"
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: "/"
     schedule: { interval: weekly }
+    open-pull-requests-limit: 0
