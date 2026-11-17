@@ -26,5 +26,9 @@ Third-party notices
   by wrangler/miniflare are licensed LGPL-3.0-or-later. They are not bundled into
   or distributed with this project's build outputs.
 
+- Development tooling only: lightningcss (via vite) is licensed MPL-2.0, and
+  caniuse-lite (via browserslist) is licensed CC-BY-4.0. They run at build or
+  lint time and are not bundled into or distributed with the build outputs.
+
 Other npm dependencies are used under their own licenses, as recorded in
 package-lock.json.
