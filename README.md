@@ -54,7 +54,7 @@ packages/
 ├── cortex-server/     Host-neutral Snowflake/Cortex server integration (source-only)
 └── teams-manifest/    Teams app manifest generator + icons
 docs/                  Install guides and auth patterns
-skills/                Claude Code deploy skills (teams-deploy, teams-deploy-edge-node)
+skills/                Cortex Code deploy skills (teams-deploy, teams-deploy-edge-node)
 snowflake/superstore-360/   Sample Superstore data, semantic view and demo agent SQL
 ```
 
@@ -75,7 +75,7 @@ Scripts live in `apps/teams/scripts/` (`validate-env.sh`, `deploy-spcs.sh`,
 `apps/teams/edge.Dockerfile` when a Cloudflare tunnel is not allowed.
 
 The `teams-deploy` and `teams-deploy-edge-node` skills under [`skills/`](skills)
-wrap these flows for Claude Code.
+wrap these flows for Cortex Code.
 
 ## Security notes
 
