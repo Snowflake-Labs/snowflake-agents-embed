@@ -127,7 +127,7 @@ GRANT READ ON SECRET CONFIG.SNOWFLAKE_ACCOUNT_NAME TO APPLICATION ROLE APP_ADMIN
 
 -- Security integration: EXTERNAL_OAUTH_ANY_ROLE_MODE = 'ENABLE' is required for session:role-any
 -- (the install default). Preferred: pin a role with scope session:role:<ROLE> and call
--- CONFIG.SET_ANY_ROLE_MODE('DISABLE') - see docs/install-teams.md "Security settings".
+-- CONFIG.SET_ANY_ROLE_MODE('DISABLE') - see docs/teams/install.md "Security settings".
 -- The user mapping claim is 'upn' ONLY. 'email' and 'preferred_username' are user-editable in
 -- Entra, so mapping them to login_name lets one account sign in as another (nOAuth class).
 -- After creation the consumer should also run (role-any otherwise reaches every granted role):

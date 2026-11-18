@@ -1,6 +1,6 @@
 -- Copyright 2026 Snowflake Inc.
 -- SPDX-License-Identifier: Apache-2.0
--- Bootstrap for the standalone Teams SPCS service (install-teams.md Path A).
+-- Bootstrap for the standalone Teams SPCS service (docs/teams/install.md Path A).
 -- Idempotent (IF NOT EXISTS throughout) — safe to re-run.
 --
 -- This is NOT the Native App setup.sql — no APPLICATION ROLE, no AGENTS_TEAMS_APP,
@@ -14,7 +14,7 @@
 -- Snowflake does not allow ACCOUNTADMIN to own a service (ingress RBAC
 -- misbehaves under that owner).
 --
--- Operator order (see docs/install-teams.md Path A):
+-- Operator order (see docs/teams/install.md Path A):
 --   1. This file through the ACCOUNTADMIN section
 --   2. Create the Entra apps (wizard tabs 1-6) and fill apps/teams/.env
 --   3. bash apps/teams/scripts/fill-dev-secrets.sh
@@ -25,7 +25,7 @@
 --   7. bash apps/teams/scripts/deploy-tab.sh
 --
 -- Private connectivity (optional, NETWORK_MODE=hybrid|privatelink in .env): see
--- docs/install-teams.md "Private connectivity". Before step 5, apply the
+-- docs/teams/private-connectivity.md. Before step 5, apply the
 -- COMPUTE_POOL network rule on CORTEX_TEAMS_OAUTH (the Native App wizard's
 -- Network tab generates the same SQL), and in create-dev-service.sql set
 -- SNOWFLAKE_HOST_MODE to internal and uncomment its capabilities block. Keep

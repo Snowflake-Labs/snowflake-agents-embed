@@ -4,13 +4,13 @@ Customer-safe probes. Do not print secret values. After any `bash apps/teams/scr
 
 The edge is one Cloudflare Worker (`packages/teams-edge`). Its name is `EDGE_WORKER_NAME`, else legacy `PAGES_PROJECT`, else the first label of a `*.workers.dev` `TAB_BASE_HOST` (a `*.pages.dev` host maps to its name minus `.pages.dev`), else `agents-embed-teams`; both scripts read it from `apps/teams/.env`. Always invoke Wrangler from `packages/teams-edge`, and never pass `--env privatelink` to `tail` / `secret` (Wrangler would target `<worker>-privatelink`, which does not exist).
 
-Source detail: [docs/install-teams.md § 4](../../../docs/install-teams.md#4-verify-and-common-failures).
+Source detail: [docs/teams/troubleshooting.md § 4](../../../docs/teams/troubleshooting.md).
 
 ---
 
 ## Setup script errors (install time)
 
-Doc: [docs/install-teams.md § 4.1, During install](../../../docs/install-teams.md#41-during-install-script-and-deploy-errors). Fix the `apps/teams/.env` value, then re-run the same script (all are idempotent).
+Doc: [docs/teams/troubleshooting.md § 4.1, During install](../../../docs/teams/troubleshooting.md#41-during-install-script-and-deploy-errors). Fix the `apps/teams/.env` value, then re-run the same script (all are idempotent).
 
 ### I1 — tenant setup with `az`: `Cannot find user or service principal ... 'TEAMS_USERNAME=…'`
 
@@ -30,11 +30,11 @@ Probe: `snow sql -q "SHOW IMAGE REPOSITORIES IN SCHEMA AGENTS_TEAMS_APP_DB.PUBLI
 
 ### I14 — `wrangler deploy`: workers.dev subdomain or Worker name
 
-Symptoms: `You need to register a workers.dev subdomain before publishing to workers.dev`; `EDGE_WORKER_NAME "…" is not a valid Worker name`; or `set-edge-secrets.sh` succeeded but `/token/exchange` answers 500 `Edge misconfigured` (secrets went to a different Worker). Cause: the first `wrangler deploy` creates the Worker (no project to create first), but publishing to workers.dev needs the account's subdomain; a name changed between the two scripts splits secrets from code. Fix: register the subdomain once (dashboard → Workers & Pages) or use a custom domain; set `EDGE_WORKER_NAME` in `apps/teams/.env` to the Worker that owns `TAB_BASE_HOST` (`<worker>.<account-subdomain>.workers.dev`); re-run `set-edge-secrets.sh`, then `deploy-tab.sh`. Verify: `cd packages/teams-edge && npx wrangler secret list --name <worker>` lists ten names. See [install-teams.md I14](../../../docs/install-teams.md#i14-wrangler-deploy-workersdev-subdomain-or-worker-name).
+Symptoms: `You need to register a workers.dev subdomain before publishing to workers.dev`; `EDGE_WORKER_NAME "…" is not a valid Worker name`; or `set-edge-secrets.sh` succeeded but `/token/exchange` answers 500 `Edge misconfigured` (secrets went to a different Worker). Cause: the first `wrangler deploy` creates the Worker (no project to create first), but publishing to workers.dev needs the account's subdomain; a name changed between the two scripts splits secrets from code. Fix: register the subdomain once (dashboard → Workers & Pages) or use a custom domain; set `EDGE_WORKER_NAME` in `apps/teams/.env` to the Worker that owns `TAB_BASE_HOST` (`<worker>.<account-subdomain>.workers.dev`); re-run `set-edge-secrets.sh`, then `deploy-tab.sh`. Verify: `cd packages/teams-edge && npx wrangler secret list --name <worker>` lists ten names. See [teams/troubleshooting.md I14](../../../docs/teams/troubleshooting.md#i14-wrangler-deploy-workersdev-subdomain-or-worker-name).
 
 ### I15 — `set-edge-secrets.sh`: `SNOWFLAKE_PAT is not set`
 
-Fix (user runs; the secret is shown once): `ALTER USER AGENTS_TEAMS_SVC ADD PROGRAMMATIC ACCESS TOKEN <NAME> ROLE_RESTRICTION = '<role>' DAYS_TO_EXPIRY = 30;` then paste `token_secret` into `SNOWFLAKE_PAT=` (no whitespace). Never print it. Afterwards suggest removing superseded PATs with `ALTER USER … REMOVE PROGRAMMATIC ACCESS TOKEN <old>`. The same `✗ <NAME> is not set` covers every required key; in privatelink it stops instead with `NETWORK_MODE=privatelink needs SPCS_BASE=https://<privatelink_ingress_url>`. See [install-teams.md I15](../../../docs/install-teams.md#i15-set-edge-secretssh-snowflake_pat-is-not-set).
+Fix (user runs; the secret is shown once): `ALTER USER AGENTS_TEAMS_SVC ADD PROGRAMMATIC ACCESS TOKEN <NAME> ROLE_RESTRICTION = '<role>' DAYS_TO_EXPIRY = 30;` then paste `token_secret` into `SNOWFLAKE_PAT=` (no whitespace). Never print it. Afterwards suggest removing superseded PATs with `ALTER USER … REMOVE PROGRAMMATIC ACCESS TOKEN <old>`. The same `✗ <NAME> is not set` covers every required key; in privatelink it stops instead with `NETWORK_MODE=privatelink needs SPCS_BASE=https://<privatelink_ingress_url>`. See [teams/troubleshooting.md I15](../../../docs/teams/troubleshooting.md#i15-set-edge-secretssh-snowflake_pat-is-not-set).
 
 ### I17 — `/api/*` 500, Cloudflare 1101, UI "Failed to list threads: 500"
 
@@ -46,7 +46,7 @@ Transient Wrangler network error. Retry; if persistent, `cd packages/teams-edge 
 
 ### I21 — `CREATE SERVICE`: `Secret ... does not exist or not authorized`
 
-Cause: `create-dev-service.sql` runs as SYSADMIN, which needs `READ` on all 12 secrets in `AGENTS_TEAMS_APP_DB.CONFIG`; an older bootstrap did not grant it. Fix (ACCOUNTADMIN): re-run `bootstrap-dev-spcs.sql` (idempotent), or `GRANT READ ON SECRET AGENTS_TEAMS_APP_DB.CONFIG.<name> TO ROLE SYSADMIN` for each, then re-run the rendered `create-dev-service.sql`. See [install-teams.md I21](../../../docs/install-teams.md#i21-create-service-secret--does-not-exist-or-not-authorized).
+Cause: `create-dev-service.sql` runs as SYSADMIN, which needs `READ` on all 12 secrets in `AGENTS_TEAMS_APP_DB.CONFIG`; an older bootstrap did not grant it. Fix (ACCOUNTADMIN): re-run `bootstrap-dev-spcs.sql` (idempotent), or `GRANT READ ON SECRET AGENTS_TEAMS_APP_DB.CONFIG.<name> TO ROLE SYSADMIN` for each, then re-run the rendered `create-dev-service.sql`. See [teams/troubleshooting.md I21](../../../docs/teams/troubleshooting.md#i21-create-service-secret--does-not-exist-or-not-authorized).
 
 ### Diagnostics — Need the real edge Worker exception
 
@@ -96,7 +96,7 @@ grep -n '"resource"' packages/teams-manifest/manifest.json
 cd packages/teams-edge && npx wrangler deployments list --name <worker>   # need an active version
 ```
 
-**Fix.** Align `TAB_BASE_HOST` / `TAB_BASE_URL` with the registered URI host (or add the host with `az ad app update --id <OBO_CLIENT_ID> --identifier-uris …`, listing every URI to keep: the flag replaces the set; needs user approval), then `set-edge-secrets.sh`, `deploy-tab.sh`, `set-bot-endpoint.sh`, update SPCS `ALLOWED_ORIGINS` and roll, `zip.sh`, re-upload in Teams. Moving off `*.pages.dev` follows the same order ([install-teams.md § 6](../../../docs/install-teams.md#6-pages-to-worker-cutover)). See [install-teams.md T1](../../../docs/install-teams.md#t1-aadsts500011-and-nothing-is-here-yet).
+**Fix.** Align `TAB_BASE_HOST` / `TAB_BASE_URL` with the registered URI host (or add the host with `az ad app update --id <OBO_CLIENT_ID> --identifier-uris …`, listing every URI to keep: the flag replaces the set; needs user approval), then `set-edge-secrets.sh`, `deploy-tab.sh`, `set-bot-endpoint.sh`, update SPCS `ALLOWED_ORIGINS` and roll, `zip.sh`, re-upload in Teams. Moving off `*.pages.dev` follows the same order ([teams/install.md § 6](../../../docs/teams/install.md#6-pages-to-worker-cutover)). See [teams/troubleshooting.md T1](../../../docs/teams/troubleshooting.md#t1-aadsts500011-and-nothing-is-here-yet).
 
 ---
 
@@ -247,7 +247,7 @@ Use `--requested-access-token-version 2`; `--set api.requestedAccessTokenVersion
 
 ## Add to channel: `BadRequest ... BulkMembershipRequest`
 
-**Cause.** The manifest's `bots[].botId` has no Azure Bot Service, or its Teams channel is disabled. See [I20](../../../docs/install-teams.md#i20-adding-the-app-to-a-channel-badrequest--bulkmembershiprequest).
+**Cause.** The manifest's `bots[].botId` has no Azure Bot Service, or its Teams channel is disabled. See [I20](../../../docs/teams/troubleshooting.md#i20-adding-the-app-to-a-channel-badrequest--bulkmembershiprequest).
 
 **Fix.** `bash apps/teams/scripts/create-bot.sh` to diagnose; `--apply` to create (confirm first: it creates Azure resources). `smoke-test.sh` reports the same under Bot.
 
@@ -306,9 +306,9 @@ The tokenless 401 is the edge's own: with no `X-Edge-Session` it returns before 
 
 **Symptom.** `/api/*` 401: `Incoming request with IP/Token <public-ip> is not allowed`. The IP is a Cloudflare edge range (`104.16/13`, `172.64/13`, `162.158/15`, …), not SPCS NAT and not `10.x`.
 
-**Cause.** The edge Worker authenticates to ingress with `SPCS_PAT`. Snowflake evaluates that **PAT user's** network policy against the Cloudflare egress IP. The managed account policy is not the lever. In `privatelink` the PAT user's policy is `AGENTS_TEAMS_PL_INGRESS_POLICY` (private endpoint IDs), which replaces this one; a Cloudflare IP there means the edge was deployed without `--privatelink` or `SPCS_BASE` still points at the public ingress ([PL3](../../../docs/install-teams.md#pl3-the-private-ingress-rejects-the-edge-401-or-403)).
+**Cause.** The edge Worker authenticates to ingress with `SPCS_PAT`. Snowflake evaluates that **PAT user's** network policy against the Cloudflare egress IP. The managed account policy is not the lever. In `privatelink` the PAT user's policy is `AGENTS_TEAMS_PL_INGRESS_POLICY` (private endpoint IDs), which replaces this one; a Cloudflare IP there means the edge was deployed without `--privatelink` or `SPCS_BASE` still points at the public ingress ([PL3](../../../docs/teams/private-connectivity.md#pl3-the-private-ingress-rejects-the-edge-401-or-403)).
 
-**Fix.** Run `bash apps/teams/scripts/set-svc-network-policy.sh [-c <conn>] [--apply]` (dry run by default; skips a user that already has another user-level policy unless `--replace`). This is an explicit install step ([install-teams.md 5a](../../../docs/install-teams.md)), not optional: `smoke-test.sh` now fails without it. The manual equivalent: give the PAT user a user-level policy that allows Cloudflare egress. Use the published ranges (<https://www.cloudflare.com/ips-v4>) in a dedicated policy; do not use `0.0.0.0/0`. Do **not** edit `ACCOUNT_VPN_POLICY_SE` and do **not** add Cloudflare ranges to the account policy.
+**Fix.** Run `bash apps/teams/scripts/set-svc-network-policy.sh [-c <conn>] [--apply]` (dry run by default; skips a user that already has another user-level policy unless `--replace`). This is an explicit install step ([teams/install.md 5a](../../../docs/teams/install.md)), not optional: `smoke-test.sh` now fails without it. The manual equivalent: give the PAT user a user-level policy that allows Cloudflare egress. Use the published ranges (<https://www.cloudflare.com/ips-v4>) in a dedicated policy; do not use `0.0.0.0/0`. Do **not** edit `ACCOUNT_VPN_POLICY_SE` and do **not** add Cloudflare ranges to the account policy.
 
 ```sql
 CREATE NETWORK POLICY IF NOT EXISTS AGENTS_TEAMS_INGRESS_POLICY
@@ -348,7 +348,7 @@ Use the `ACTIVE` row, not `*_ROTATED_*`.
 
 **Cause.** This is the SPCS → Cortex hop, not the Cloudflare → ingress hop (see "Cloudflare IP blocked at ingress"). The NAT range is region-specific, so never reuse a range from another account or from older docs. If the blocked IP is public and the image is current, the account policy simply lacks the NAT range. Otherwise a Cortex URL built from injected `SNOWFLAKE_HOST` uses an un-allowlistable private path. In `public` the shipped image builds from `SNOWFLAKE_ACCOUNT` (`SNOWFLAKE_HOST_MODE=account`, public NAT). Do **not** tell the customer to edit server source.
 
-In `hybrid` / `privatelink` with `SNOWFLAKE_HOST_MODE=internal` the blocked IP is a private address and a NAT `/24` cannot match it. But `internal` is experimental: it returned `395090` for forwarded user tokens in testing, and `account` mode worked ([PL8](../../../docs/install-teams.md#pl8-395090-with-snowflake_host_modeinternal)). If you do use `internal`, the fix is `AGENTS_TEAMS_POOL_POLICY` (a `COMPUTE_POOL` ingress rule for `AGENTS_TEAMS_APP_POOL`) on `CORTEX_TEAMS_OAUTH`, applied from wizard 8c or [install-teams.md § 7.4](../../../docs/install-teams.md#74-network-sql-accountadmin) **before** Create/Roll. A user with their own network policy overrides the integration's, so that policy also needs the pool rule. See [PL1](../../../docs/install-teams.md#pl1-390422-after-switching-to-hybrid-or-privatelink).
+In `hybrid` / `privatelink` with `SNOWFLAKE_HOST_MODE=internal` the blocked IP is a private address and a NAT `/24` cannot match it. But `internal` is experimental: it returned `395090` for forwarded user tokens in testing, and `account` mode worked ([PL8](../../../docs/teams/private-connectivity.md#pl8-395090-with-snowflake_host_modeinternal)). If you do use `internal`, the fix is `AGENTS_TEAMS_POOL_POLICY` (a `COMPUTE_POOL` ingress rule for `AGENTS_TEAMS_APP_POOL`) on `CORTEX_TEAMS_OAUTH`, applied from wizard 8c or [teams/private-connectivity.md § 7.4](../../../docs/teams/private-connectivity.md#74-network-sql-accountadmin) **before** Create/Roll. A user with their own network policy overrides the integration's, so that policy also needs the pool rule. See [PL1](../../../docs/teams/private-connectivity.md#pl1-390422-after-switching-to-hybrid-or-privatelink).
 
 External-OAuth source-IP is the network policy **on the integration**, independent of the account policy.
 
@@ -388,7 +388,7 @@ ALTER SECURITY INTEGRATION CORTEX_TEAMS_OAUTH
 
 **Cause.** The edge origin is not the Entra-authorized host. A new custom domain or `*.workers.dev` host fails until it is on the Entra / Teams SSO app.
 
-**Fix.** Reuse the existing `EDGE_WORKER_NAME` / `TAB_BASE_HOST`. Point wizard tab 9 (9a CDN Domain), `TAB_BASE_URL`, and the manifest at that same origin. Moving from a Pages host is the cutover in [install-teams.md § 6](../../../docs/install-teams.md#6-pages-to-worker-cutover).
+**Fix.** Reuse the existing `EDGE_WORKER_NAME` / `TAB_BASE_HOST`. Point wizard tab 9 (9a CDN Domain), `TAB_BASE_URL`, and the manifest at that same origin. Moving from a Pages host is the cutover in [teams/install.md § 6](../../../docs/teams/install.md#6-pages-to-worker-cutover).
 
 ---
 
@@ -400,7 +400,7 @@ ALTER SECURITY INTEGRATION CORTEX_TEAMS_OAUTH
 
 ## Legacy: `wrangler pages deploy` `Project not found` (`8000007`)
 
-Only from an old Pages-era script or runbook. `deploy-tab.sh` now runs `wrangler deploy`, and the first deploy creates the Worker, so there is no project to create. If you see this, you are running a stale command: use `deploy-tab.sh` and, for an existing `*.pages.dev` install, follow the cutover in [install-teams.md § 6](../../../docs/install-teams.md#6-pages-to-worker-cutover). Do not create a new Pages project.
+Only from an old Pages-era script or runbook. `deploy-tab.sh` now runs `wrangler deploy`, and the first deploy creates the Worker, so there is no project to create. If you see this, you are running a stale command: use `deploy-tab.sh` and, for an existing `*.pages.dev` install, follow the cutover in [teams/install.md § 6](../../../docs/teams/install.md#6-pages-to-worker-cutover). Do not create a new Pages project.
 
 ---
 
@@ -424,43 +424,43 @@ By design. Teams tabs block the browser speech API in the iframe. Not a deploy f
 
 # Private connectivity (`hybrid` / `privatelink`) only
 
-PL1-PL7 come from the design; PL8-PL10 were observed on AWS PrivateLink on 2026-10-09. The Worker + cloudflared path itself passed (tab chat and a real Teams bot message). It also passed on Azure (2026-10-10) and GCP (2026-10-11) without the real bot message; PL11-PL14 come from those runs. The Node edge and the GCP teardown are untested. Doc: [install-teams.md § 7.7](../../../docs/install-teams.md#77-private-connectivity-failures). In `public` none of them apply.
+PL1-PL7 come from the design; PL8-PL10 were observed on AWS PrivateLink on 2026-10-09. The Worker + cloudflared path itself passed (tab chat and a real Teams bot message). It also passed on Azure (2026-10-10) and GCP (2026-10-11) without the real bot message; PL11-PL14 come from those runs. The Node edge and the GCP teardown are untested. Doc: [teams/private-connectivity.md § 7.7](../../../docs/teams/private-connectivity.md#77-private-connectivity-failures). In `public` none of them apply.
 
 ### PL1 — 390422 after switching to `hybrid` or `privatelink`
 
-The container now takes the internal route (`SNOWFLAKE_HOST_MODE=internal`), which a NAT `/24` cannot match. Apply the `COMPUTE_POOL` rule SQL (wizard 8c, or [§ 7.4](../../../docs/install-teams.md#74-network-sql-accountadmin)) **before** Create/Roll. Users with their own network policy override the integration's; the wizard's `POLICY_REFERENCES` query lists them (it can lag ~2 hours), and their policies need the pool rule too. [PL1](../../../docs/install-teams.md#pl1-390422-after-switching-to-hybrid-or-privatelink).
+The container now takes the internal route (`SNOWFLAKE_HOST_MODE=internal`), which a NAT `/24` cannot match. Apply the `COMPUTE_POOL` rule SQL (wizard 8c, or [§ 7.4](../../../docs/teams/private-connectivity.md#74-network-sql-accountadmin)) **before** Create/Roll. Users with their own network policy override the integration's; the wizard's `POLICY_REFERENCES` query lists them (it can lag ~2 hours), and their policies need the pool rule too. [PL1](../../../docs/teams/private-connectivity.md#pl1-390422-after-switching-to-hybrid-or-privatelink).
 
 ### PL2 — NXDOMAIN for a `.privatelink` host
 
-From the edge side (VPC VM, cloudflared host): private DNS for the `privatelink_ingress_url` host is missing; add the records from `SYSTEM$GET_PRIVATELINK_CONFIG` ([§ 7.5](../../../docs/install-teams.md#75-private-dns)). Inside SPCS: `SNOWFLAKE_ACCOUNT` must stay in the org-account form, because the `.privatelink` account host does not resolve there. [PL2](../../../docs/install-teams.md#pl2-nxdomain-for-a-privatelink-host).
+From the edge side (VPC VM, cloudflared host): private DNS for the `privatelink_ingress_url` host is missing; add the records from `SYSTEM$GET_PRIVATELINK_CONFIG` ([§ 7.5](../../../docs/teams/private-connectivity.md#75-private-dns)). Inside SPCS: `SNOWFLAKE_ACCOUNT` must stay in the org-account form, because the `.privatelink` account host does not resolve there. [PL2](../../../docs/teams/private-connectivity.md#pl2-nxdomain-for-a-privatelink-host).
 
 ### PL3 — The private ingress rejects the edge (401 or 403)
 
-`401` "Incoming request with IP/Token … is not allowed": the private endpoint ID in `AGENTS_TEAMS_PL_INGRESS_RULE` (`AWSVPCEID` / `AZURELINKID` / `GCPPSCID`) is wrong or missing, the policy is not on the PAT user, or the edge still calls the public ingress (Cloudflare IP). Fix the rule or `SPCS_BASE`; do not widen the policy to the internet. `403 Insufficient privileges`: the PAT user lacks `APP_PUBLIC`. The edge probe still returns its own 401; check in the tab. [PL3](../../../docs/install-teams.md#pl3-the-private-ingress-rejects-the-edge-401-or-403).
+`401` "Incoming request with IP/Token … is not allowed": the private endpoint ID in `AGENTS_TEAMS_PL_INGRESS_RULE` (`AWSVPCEID` / `AZURELINKID` / `GCPPSCID`) is wrong or missing, the policy is not on the PAT user, or the edge still calls the public ingress (Cloudflare IP). Fix the rule or `SPCS_BASE`; do not widen the policy to the internet. `403 Insufficient privileges`: the PAT user lacks `APP_PUBLIC`. The edge probe still returns its own 401; check in the tab. [PL3](../../../docs/teams/private-connectivity.md#pl3-the-private-ingress-rejects-the-edge-401-or-403).
 
 ### PL4 — Northstar host, audience, or certificate mismatch
 
-Copy `SPCS_BASE` verbatim from `SHOW ENDPOINTS` (`privatelink_ingress_url`), including any `-next` form, and build DNS from that actual host. Known issues: the token audience can differ from the host form, and the wildcard can miss the served certificate SAN. [PL4](../../../docs/install-teams.md#pl4-northstar-host-audience-or-certificate-mismatch).
+Copy `SPCS_BASE` verbatim from `SHOW ENDPOINTS` (`privatelink_ingress_url`), including any `-next` form, and build DNS from that actual host. Known issues: the token audience can differ from the host form, and the wildcard can miss the served certificate SAN. [PL4](../../../docs/teams/private-connectivity.md#pl4-northstar-host-audience-or-certificate-mismatch).
 
 ### PL5 — `cloudflared` cannot connect (UDP 7844)
 
-The tunnel host needs outbound UDP 7844 (QUIC) to Cloudflare, with TCP 7844 (HTTP/2) as the fallback. Open that egress on the VPC VM's security group / firewall, or run `cloudflared tunnel run --protocol http2 <tunnel>` if UDP cannot be opened, then re-check the tunnel in the dashboard. [PL5](../../../docs/install-teams.md#pl5-cloudflared-cannot-connect-udp-7844).
+The tunnel host needs outbound UDP 7844 (QUIC) to Cloudflare, with TCP 7844 (HTTP/2) as the fallback. Open that egress on the VPC VM's security group / firewall, or run `cloudflared tunnel run --protocol http2 <tunnel>` if UDP cannot be opened, then re-check the tunnel in the dashboard. [PL5](../../../docs/teams/private-connectivity.md#pl5-cloudflared-cannot-connect-udp-7844).
 
 ### PL6 — 500 `Edge misconfigured` in `privatelink`
 
-The tab loads (static assets do not run the Worker), but every `/api/*` and `/token/*` request is 500 `{"error":"Edge misconfigured"}`: the deployed Worker has `SPCS_UPSTREAM=vpc` but no `SPCS_VPC` binding (the edge fails closed). Set `SPCS_VPC_SERVICE_ID` in `apps/teams/.env` (`npx wrangler vpc service create …` prints it), then `bash apps/teams/scripts/deploy-tab.sh --privatelink`. [PL6](../../../docs/install-teams.md#pl6-edge-misconfigured-500-in-privatelink).
+The tab loads (static assets do not run the Worker), but every `/api/*` and `/token/*` request is 500 `{"error":"Edge misconfigured"}`: the deployed Worker has `SPCS_UPSTREAM=vpc` but no `SPCS_VPC` binding (the edge fails closed). Set `SPCS_VPC_SERVICE_ID` in `apps/teams/.env` (`npx wrangler vpc service create …` prints it), then `bash apps/teams/scripts/deploy-tab.sh --privatelink`. [PL6](../../../docs/teams/private-connectivity.md#pl6-edge-misconfigured-500-in-privatelink).
 
 ### PL7 — Node edge will not start or the link store is locked
 
-The self-hosted edge refuses to boot on: a second replica holding the SQLite lock (`locked by another process`), a data dir or DB file that is group or world accessible or owned by another user, running as root, or a missing required variable (`BOT_APP_ID` and `BOT_LINK_SECRET` are required). Run exactly one replica, fix the volume with `chown node:node` and `chmod 700` (dir) / `600` (file), and never delete the `-wal` or `-shm` files. [PL7](../../../docs/install-teams.md#pl7-the-node-edge-will-not-start-or-the-link-store-is-locked).
+The self-hosted edge refuses to boot on: a second replica holding the SQLite lock (`locked by another process`), a data dir or DB file that is group or world accessible or owned by another user, running as root, or a missing required variable (`BOT_APP_ID` and `BOT_LINK_SECRET` are required). Run exactly one replica, fix the volume with `chown node:node` and `chmod 700` (dir) / `600` (file), and never delete the `-wal` or `-shm` files. [PL7](../../../docs/teams/private-connectivity.md#pl7-the-node-edge-will-not-start-or-the-link-store-is-locked).
 
-Tear down: [§ 7.8](../../../docs/install-teams.md#78-tear-down-private-connectivity).
+Tear down: [§ 7.8](../../../docs/teams/private-connectivity.md#78-tear-down-private-connectivity).
 
 ---
 
 # Native App (Path B) only
 
-Installed via the Native App (Appendix B of install-teams.md: [install-teams.md § B.5](../../../docs/install-teams.md#b5-native-app-failures)).
+Installed via the Native App ([teams/native-app.md § B.5](../../../docs/teams/native-app.md#b5-native-app-failures)).
 
 ## Service `ENOTFOUND` for `*.snowflakecomputing.com`
 
@@ -525,28 +525,28 @@ Retry Create Service.
 
 ### PL8 — `395090` with `SNOWFLAKE_HOST_MODE=internal`
 
-Every container → Snowflake call fails with upstream 401 `395090` ("Please use OAuth"); the tab shows `agent_forbidden`; no `390422`. Cause: the SPCS-internal host accepts only the SPCS-issued service token, so forwarded External OAuth, PAT and JWT credentials are rejected regardless of `enableCustomCredentials` or the pool rule. The server reports it as `host_mode_rejects_user_token`. Fix: set `SNOWFLAKE_HOST_MODE: account` in the live spec and keep the T8 policy. `deploy-spcs.sh` writes `account` by default; only `SPCS_HOST_MODE=internal` in `apps/teams/.env` writes `internal`. Open question for Snowflake: a private egress path for non-SPCS credentials. [PL8](../../../docs/install-teams.md#pl8-395090-with-snowflake_host_modeinternal)
+Every container → Snowflake call fails with upstream 401 `395090` ("Please use OAuth"); the tab shows `agent_forbidden`; no `390422`. Cause: the SPCS-internal host accepts only the SPCS-issued service token, so forwarded External OAuth, PAT and JWT credentials are rejected regardless of `enableCustomCredentials` or the pool rule. The server reports it as `host_mode_rejects_user_token`. Fix: set `SNOWFLAKE_HOST_MODE: account` in the live spec and keep the T8 policy. `deploy-spcs.sh` writes `account` by default; only `SPCS_HOST_MODE=internal` in `apps/teams/.env` writes `internal`. Open question for Snowflake: a private egress path for non-SPCS credentials. [PL8](../../../docs/teams/private-connectivity.md#pl8-395090-with-snowflake_host_modeinternal)
 
 ### PL9 — The PAT still works from the internet
 
-With `AGENTS_TEAMS_PL_INGRESS_POLICY` attached to the PAT user, a laptop PAT still gets `200` on the public ingress and the SQL API; `LOGIN_HISTORY_BY_USER` shows `client_ip` `0.0.0.0` and no rejection. Do not rely on the endpoint-ID policy as the control. Keep `ROLE_RESTRICTION`, short expiry and the T7 policy, and raise it with Snowflake. Test the ingress with `Authorization: Snowflake Token="<PAT>"`, not `Bearer`. [PL9](../../../docs/install-teams.md#pl9-the-pat-still-works-from-the-internet)
+With `AGENTS_TEAMS_PL_INGRESS_POLICY` attached to the PAT user, a laptop PAT still gets `200` on the public ingress and the SQL API; `LOGIN_HISTORY_BY_USER` shows `client_ip` `0.0.0.0` and no rejection. Do not rely on the endpoint-ID policy as the control. Keep `ROLE_RESTRICTION`, short expiry and the T7 policy, and raise it with Snowflake. Test the ingress with `Authorization: Snowflake Token="<PAT>"`, not `Bearer`. [PL9](../../../docs/teams/private-connectivity.md#pl9-the-pat-still-works-from-the-internet)
 
 ### PL10 — `thread_not_found` 404 after enforcing
 
-After `SYSTEM$ENFORCE_PRIVATELINK_ACCESS_ONLY()` the tab's `GET /api/threads` returned 404 `thread_not_found` (any upstream 404 maps to it), with no `Upstream 404` in the container log and `200 []` for the same call with the service PAT. Cause undetermined. Enforcement also did not block public key-pair or PAT logins, and the public ingress went to 500. Revert with `SELECT SYSTEM$DISABLE_PRIVATELINK_ACCESS_ONLY();` (through the SSM port-forward recovery path if needed) and retry. Never enforce without an explicit go-ahead. [PL10](../../../docs/install-teams.md#pl10-thread_not_found-404-after-enforcing)
+After `SYSTEM$ENFORCE_PRIVATELINK_ACCESS_ONLY()` the tab's `GET /api/threads` returned 404 `thread_not_found` (any upstream 404 maps to it), with no `Upstream 404` in the container log and `200 []` for the same call with the service PAT. Cause undetermined. Enforcement also did not block public key-pair or PAT logins, and the public ingress went to 500. Revert with `SELECT SYSTEM$DISABLE_PRIVATELINK_ACCESS_ONLY();` (through the SSM port-forward recovery path if needed) and retry. Never enforce without an explicit go-ahead. [PL10](../../../docs/teams/private-connectivity.md#pl10-thread_not_found-404-after-enforcing)
 
 ### PL11 — Account network policy blocks the container's egress (`account` host mode)
 
-Tab shows the T8 "network policy is blocking this connection" banner and the agent selector is empty, but the PAT user works. `SNOWFLAKE.INFORMATION_SCHEMA.LOGIN_HISTORY` shows the user from an SPCS egress address (a pool, e.g. a `/24`; `35.246.9.x` on GCP `europe-west2`, `153.45.151.x` on Azure westus2) as `INCOMING_REQUEST_BLOCKED`. Fix: allow the egress range for the Teams users or `CORTEX_TEAMS_OAUTH` only; never edit the account-wide policy. Full entry: [PL11](../../../docs/install-teams.md#pl11-account-network-policy-blocks-the-containers-egress-account-host-mode).
+Tab shows the T8 "network policy is blocking this connection" banner and the agent selector is empty, but the PAT user works. `SNOWFLAKE.INFORMATION_SCHEMA.LOGIN_HISTORY` shows the user from an SPCS egress address (a pool, e.g. a `/24`; `35.246.9.x` on GCP `europe-west2`, `153.45.151.x` on Azure westus2) as `INCOMING_REQUEST_BLOCKED`. Fix: allow the egress range for the Teams users or `CORTEX_TEAMS_OAUTH` only; never edit the account-wide policy. Full entry: [PL11](../../../docs/teams/private-connectivity.md#pl11-account-network-policy-blocks-the-containers-egress-account-host-mode).
 
 ### PL12 — Agent selector empty although agents exist
 
-`runShowAgents` (`cortex-server/src/snowflake/list-agents.ts`) returns `[]` on any non-OK response, so a blocked login or missing grant looks like no agents. Check `LOGIN_HISTORY` and the `agents-teams-app` container log first. If the PAT user's `SHOW AGENTS` is `200` with no rows, the role lacks `USAGE ON AGENT` (a grants script may not grant it): grant it. Known code gap. See [PL12](../../../docs/install-teams.md#pl12-the-agent-selector-is-empty-although-agents-exist).
+`runShowAgents` (`cortex-server/src/snowflake/list-agents.ts`) returns `[]` on any non-OK response, so a blocked login or missing grant looks like no agents. Check `LOGIN_HISTORY` and the `agents-teams-app` container log first. If the PAT user's `SHOW AGENTS` is `200` with no rows, the role lacks `USAGE ON AGENT` (a grants script may not grant it): grant it. Known code gap. See [PL12](../../../docs/teams/private-connectivity.md#pl12-the-agent-selector-is-empty-although-agents-exist).
 
 ### PL13 — Default agent needs a warehouse the account lacks
 
-Sample agent references `CORTEX_WH`; fresh trial accounts have none, and the user's `DEFAULT_ROLE` needs a default warehouse. Create or point at a warehouse, grant `USAGE`, set `DEFAULT_WAREHOUSE`. See [PL13](../../../docs/install-teams.md#pl13-the-default-agent-needs-a-warehouse-the-account-does-not-have).
+Sample agent references `CORTEX_WH`; fresh trial accounts have none, and the user's `DEFAULT_ROLE` needs a default warehouse. Create or point at a warehouse, grant `USAGE`, set `DEFAULT_WAREHOUSE`. See [PL13](../../../docs/teams/private-connectivity.md#pl13-the-default-agent-needs-a-warehouse-the-account-does-not-have).
 
 ### PL14 — GCP Secret Manager IAM denied for the tunnel VM
 
-`gcloud secrets add-iam-policy-binding` returns `403 secretmanager.secrets.setIamPolicy` denied, so the VM service account cannot read the tunnel token and `cloudflared` never starts. Ask a project admin for `secretAccessor` on that one secret; do not widen IAM yourself. Fallback only with the user's explicit OK: pass the token in an instance metadata key, then remove the key and delete the secret straight after `cloudflared` is active. See [PL14](../../../docs/install-teams.md#pl14-gcp-secret-manager-iam-denied-for-the-tunnel-vm).
+`gcloud secrets add-iam-policy-binding` returns `403 secretmanager.secrets.setIamPolicy` denied, so the VM service account cannot read the tunnel token and `cloudflared` never starts. Ask a project admin for `secretAccessor` on that one secret; do not widen IAM yourself. Fallback only with the user's explicit OK: pass the token in an instance metadata key, then remove the key and delete the secret straight after `cloudflared` is active. See [PL14](../../../docs/teams/private-connectivity.md#pl14-gcp-secret-manager-iam-denied-for-the-tunnel-vm).

@@ -13,7 +13,7 @@
 #
 # Prints the SQL by default; --apply runs it. A user that already has a different user-level policy is
 # left alone unless --replace. Account-level policies are never touched. Applies to NETWORK_MODE public
-# and hybrid; in privatelink see docs/install-teams.md section 7.4.
+# and hybrid; in privatelink see docs/teams/private-connectivity.md section 7.4.
 
 set -euo pipefail
 

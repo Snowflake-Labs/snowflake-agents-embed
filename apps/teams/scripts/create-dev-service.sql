@@ -1,7 +1,7 @@
 -- Copyright 2026 Snowflake Inc.
 -- SPDX-License-Identifier: Apache-2.0
 -- Path A: create standalone AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS (SYSADMIN).
--- install-teams.md step 5. Run after bootstrap-dev-spcs.sql, secrets, and a
+-- docs/teams/install.md step 5. Run after bootstrap-dev-spcs.sql, secrets, and a
 -- linux/amd64 :latest push to IMAGE_REPO. ACCOUNTADMIN must not own this service.
 -- SYSADMIN needs READ on all 12 AGENTS_TEAMS_APP_DB.CONFIG secrets (granted by
 -- bootstrap-dev-spcs.sql); without it CREATE SERVICE says "Secret ... does not exist or not authorized".
@@ -10,7 +10,7 @@
 -- teams.example.com (the edge Worker host). Then:
 --   snow sql -f apps/teams/scripts/create-dev-service.sql
 --
--- NETWORK_MODE=hybrid or privatelink (install-teams.md "Private connectivity") keep
+-- NETWORK_MODE=hybrid or privatelink (docs/teams/private-connectivity.md) keep
 -- SNOWFLAKE_HOST_MODE: account. The internal host only accepts the SPCS service token
 -- (forwarded user tokens fail with 395090), so it is service-identity-only and opt-in
 -- via SPCS_HOST_MODE=internal in apps/teams/.env, which deploy-spcs.sh applies on rolls.

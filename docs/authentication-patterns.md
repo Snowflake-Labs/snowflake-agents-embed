@@ -4,7 +4,7 @@ How Snowflake Agents Embed proves who the end user is when Cortex agent chat run
 
 Teams always uses an edge (a Cloudflare Worker, or the self-hosted Node edge) in front of the SPCS server.
 
-This page is the security-facing overview. Operator install steps start in [install-guide.md](install-guide.md), then [install-teams.md](install-teams.md).
+This page is the security-facing overview. Operator install steps start in [install-guide.md](install-guide.md), then [teams/install.md](teams/install.md).
 
 ## Two questions every request answers
 
@@ -56,7 +56,7 @@ Snowflake maps the Entra token through `CORTEX_TEAMS_OAUTH` (`TYPE = EXTERNAL_OA
 
 **Role.** Set `SNOWFLAKE_OAUTH_ROLE` in `apps/teams/.env` to request `session:role:<ROLE>`, with `EXTERNAL_OAUTH_ANY_ROLE_MODE = 'DISABLE'` on the integration (preferred). If it is blank, the token requests `session:role-any` and Snowflake may activate any role that user is granted.
 
-**Network mode.** `NETWORK_MODE` changes the path, not the identities above. `public` (default) uses the public SPCS ingress. `hybrid` keeps that ingress but sends the container's Snowflake calls to the internal `SNOWFLAKE_HOST`, allowed by a `COMPUTE_POOL` network rule on `CORTEX_TEAMS_OAUTH`. `privatelink` (preview, not yet validated end to end) has the Worker reach the private ingress through a Workers VPC tunnel, restricts the ingress-PAT user to your private-endpoint IDs, and verifies the Bot Connector JWT at the edge as well as in the container. See [Private connectivity](install-teams.md#7-private-connectivity-optional).
+**Network mode.** `NETWORK_MODE` changes the path, not the identities above. `public` (default) uses the public SPCS ingress. `hybrid` keeps that ingress but sends the container's Snowflake calls to the internal `SNOWFLAKE_HOST`, allowed by a `COMPUTE_POOL` network rule on `CORTEX_TEAMS_OAUTH`. `privatelink` (preview, not yet validated end to end) has the Worker reach the private ingress through a Workers VPC tunnel, restricts the ingress-PAT user to your private-endpoint IDs, and verifies the Bot Connector JWT at the edge as well as in the container. See [Private connectivity](teams/private-connectivity.md).
 
 **Bot.** The production bot does not fall back to the shared PAT. Per-user Snowflake identity on the bot channel is not implemented; users who need their own identity should use the tab.
 
@@ -90,6 +90,6 @@ There is no setup-wizard field for these timeouts. Configure Entra access-token 
 - User mapping is directory-driven: the Entra UPN must match a real Snowflake login. Agents Embed does not provision those users.
 - Rotate service and ingress PATs as you would any programmatic credential. Rotate Entra client secrets with `apps/teams/scripts/rotate-entra-secret.sh`
 
-For install, CORS origins, and secrets, start at [install-guide.md](install-guide.md) and continue in [install-teams.md](install-teams.md).
+For install, CORS origins, and secrets, start at [install-guide.md](install-guide.md) and continue in [teams/install.md](teams/install.md).
 
 ---

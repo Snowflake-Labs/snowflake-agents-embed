@@ -60,13 +60,14 @@ snowflake/superstore-360/   Sample Superstore data, semantic view and demo agent
 
 ## Deploying
 
-Start at [`docs/install-guide.md`](docs/install-guide.md), then
-[`docs/install-teams.md`](docs/install-teams.md), which covers:
+Start at [`docs/install-guide.md`](docs/install-guide.md), then the Teams docs in
+[`docs/teams/`](docs/teams):
 
-- standalone SPCS install (default) and Native App install (Appendix B)
-- Teams app sideload, verification and common failures (§4)
-- teardown (§5), Pages-to-Worker cutover (§6)
-- `NETWORK_MODE` `public` / `hybrid` / `privatelink` (§7)
+- [`install.md`](docs/teams/install.md): standalone SPCS install (default), Teams app sideload,
+  verification, teardown, Pages-to-Worker cutover
+- [`troubleshooting.md`](docs/teams/troubleshooting.md): install and tab errors, diagnostics
+- [`private-connectivity.md`](docs/teams/private-connectivity.md): `NETWORK_MODE` `hybrid` / `privatelink`
+- [`native-app.md`](docs/teams/native-app.md): Native App install (Path B)
 
 Scripts live in `apps/teams/scripts/` (`validate-env.sh`, `deploy-spcs.sh`,
 `set-edge-secrets.sh`, `deploy-tab.sh`, `smoke-test.sh`, and more). They read only
@@ -74,7 +75,7 @@ Scripts live in `apps/teams/scripts/` (`validate-env.sh`, `deploy-spcs.sh`,
 `apps/teams/edge.Dockerfile` when a Cloudflare tunnel is not allowed.
 
 The `teams-deploy` and `teams-deploy-edge-node` skills under [`skills/`](skills)
-wrap these flows for Claude Code. 
+wrap these flows for Claude Code.
 
 ## Security notes
 

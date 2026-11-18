@@ -16,7 +16,7 @@ allowed-tools:
 
 # Deploy the self-hosted Node edge
 
-Canonical runbook: [docs/install-teams.md § 7.6a](../../docs/install-teams.md#76a-edge-in-privatelink-self-hosted-node-edge). Do not invent a second one. Failures: [PL7](../../docs/install-teams.md#pl7-the-node-edge-will-not-start-or-the-link-store-is-locked).
+Canonical runbook: [docs/teams/private-connectivity.md § 7.6a](../../docs/teams/private-connectivity.md#76a-edge-in-privatelink-self-hosted-node-edge). Do not invent a second one. Failures: [PL7](../../docs/teams/private-connectivity.md#pl7-the-node-edge-will-not-start-or-the-link-store-is-locked).
 
 The Worker + cloudflared privatelink path was validated on AWS on 2026-10-09, but the **self-hosted Node edge itself has not been run against a real PrivateLink account**. Say so before running this for a user.
 
@@ -34,7 +34,7 @@ The Worker + cloudflared privatelink path was validated on AWS on 2026-10-09, bu
 2. Write the env file (`PUBLIC_ORIGIN`, `SPCS_BASE`, `SPCS_PAT`, `EDGE_SESSION_SECRET`, `BOT_APP_ID`, `BOT_LINK_SECRET`, plus the Entra/OBO values and `TRUSTED_PROXY_HOPS`). Reuse existing secret values when migrating from the Worker so sessions and bot links survive.
 3. Run hardened, on an encrypted volume:
    `docker run -d --name teams-edge --restart unless-stopped --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp -v teams-edge-data:/data --env-file edge.env -p 8080:8080 agents-teams-edge`
-4. Put a TLS-terminating proxy in front, point `TAB_BASE_HOST` at it, and follow the host cutover in [§ 6](../../docs/install-teams.md#6-pages-to-worker-cutover), skipping the Cloudflare steps.
+4. Put a TLS-terminating proxy in front, point `TAB_BASE_HOST` at it, and follow the host cutover in [§ 6](../../docs/teams/install.md#6-pages-to-worker-cutover), skipping the Cloudflare steps.
 5. Verify: `/healthz` returns `ok`, `/config` returns the tab shell, the edge probe returns 401, a tab chat streams, and `stat -c '%a' /data /data/bot-links.sqlite` prints `700` and `600`. Also test the bot path: `POST /api/bot/messages` with a junk Bearer token must return 401, and an @mention in a channel or group chat must get a sign-in card (no reply means the bot JWT check rejected Bot Connector; the edge log says why). A 1:1 chat with the bot shows a Teams 404 `Conversation was not found` by design (bot scopes are `team` and `groupChat`).
 
 ## Failures

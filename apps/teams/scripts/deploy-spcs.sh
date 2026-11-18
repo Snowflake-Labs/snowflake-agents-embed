@@ -86,7 +86,7 @@ fi
 TAB_HOST="${TAB_BASE_URL#https://}"; TAB_HOST="${TAB_HOST#http://}"; TAB_HOST="${TAB_HOST%%/*}"
 # shellcheck source=lib/preflight.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/preflight.sh"
-case "$TAB_HOST" in *.pages.dev) warn "TAB_BASE_URL is a legacy pages.dev host; deploy-tab.sh now deploys a Worker. See docs/install-teams.md section 6." ;; esac
+case "$TAB_HOST" in *.pages.dev) warn "TAB_BASE_URL is a legacy pages.dev host; deploy-tab.sh now deploys a Worker. See docs/teams/install.md section 6." ;; esac
 # Optional. When set, step 4 also forces SNOWFLAKE_HOST_MODE and
 # capabilities.securityContext.enableCustomCredentials to match; when unset the
 # live spec keeps whatever it has.
