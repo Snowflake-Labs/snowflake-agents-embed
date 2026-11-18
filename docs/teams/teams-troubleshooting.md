@@ -1,6 +1,6 @@
 # Teams troubleshooting
 
-Failures you can hit while installing or using Snowflake Agents for Teams (Unofficial). Install steps are in [install.md](install.md). Native App errors are in [native-app.md B.5](native-app.md#b5-native-app-failures); `hybrid` and `privatelink` errors are in [private-connectivity.md 7.7](private-connectivity.md#77-private-connectivity-failures).
+Failures you can hit while installing or using Snowflake Agents for Teams (Unofficial). Install steps are in [teams-install.md](teams-install.md). Native App errors are in [teams-native-app.md B.5](teams-native-app.md#b5-native-app-failures); `hybrid` and `privatelink` errors are in [teams-private-connectivity.md 7.7](teams-private-connectivity.md#77-private-connectivity-failures).
 
 ## How the edge gates requests
 
@@ -8,7 +8,7 @@ Failures you can hit while installing or using Snowflake Agents for Teams (Unoff
 - Every `/api/*` call except `/token/exchange` needs a valid `X-Edge-Session`; the proxy then attaches `SPCS_PAT`.
 - `/token/exchange` needs a real Entra token in `entraToken` (Teams SSO), and is limited to 30/min per IP and 10/min per identity (429 with `Retry-After`).
 
-So the edge probe in [install.md § 4](install.md#4-verify) gets the edge's own `401`, and scripts that omit `Origin` or `entraToken` fail with `Forbidden origin`; see [T11](#t11-forbidden-origin-on-api) and [T12](#t12-429-too-many-requests-on-tokenexchange).
+So the edge probe in [teams-install.md § 4](teams-install.md#4-verify) gets the edge's own `401`, and scripts that omit `Origin` or `entraToken` fail with `Forbidden origin`; see [T11](#t11-forbidden-origin-on-api) and [T12](#t12-429-too-many-requests-on-tokenexchange).
 
 ## How to read this section
 
@@ -17,7 +17,7 @@ Errors are grouped by when you hit them, and numbered in the order you usually s
 - [4.1 During install: script and deploy errors](#41-during-install-script-and-deploy-errors) (**I1 to I21**): a script, deploy or SQL step fails before you can open the tab.
 - [4.2 After install: errors in the tab](#42-after-install-errors-in-the-tab) (**T1 to T14**): the tab loads, but sign-in, the agent list or a chat fails.
 - [4.3 Diagnostics (not errors)](#43-diagnostics-not-errors): how to see the real error when the cause is not obvious
-- [7.7 Private connectivity failures](private-connectivity.md#77-private-connectivity-failures) (**PL1 to PL6**): only in `hybrid` and `privatelink`
+- [7.7 Private connectivity failures](teams-private-connectivity.md#77-private-connectivity-failures) (**PL1 to PL6**): only in `hybrid` and `privatelink`
 
 Every entry has the same shape: a heading with the error text, then **Symptom**, an optional screenshot, **Cause**, **Fix**, and **Verify** where a check exists.
 
@@ -26,13 +26,13 @@ Four rules save time:
 - **Fix in order.** On a fresh install each error hides the next.
 - **Re-run the same script.** Most install errors are a wrong or missing value in `apps/teams/.env`, and the scripts are idempotent, so after fixing the value, run the script again.
 - **Confirm the account before changing anything.** `SELECT CURRENT_ACCOUNT_NAME();` must be the account that hosts the SPCS ingress. Run the SQL fixes below in that account only.
-- **There are two separate network-policy hops.** Cloudflare → SPCS ingress is governed by the *PAT user's* policy ([T7](#t7-cloudflare-ip-is-not-allowed-to-access-snowflake)). SPCS → Cortex is governed by the policy on the *`CORTEX_TEAMS_OAUTH` integration* ([T8](#t8-account-network-policy-blocks-the-spcs-to-cortex-call)). In `hybrid` and `privatelink` the `COMPUTE_POOL` rule replaces T8's NAT range, and in `privatelink` an endpoint-ID rule replaces T7's Cloudflare ranges ([§ 7](private-connectivity.md)). Do not edit the managed `ACCOUNT_VPN_POLICY_SE`.
+- **There are two separate network-policy hops.** Cloudflare → SPCS ingress is governed by the *PAT user's* policy ([T7](#t7-cloudflare-ip-is-not-allowed-to-access-snowflake)). SPCS → Cortex is governed by the policy on the *`CORTEX_TEAMS_OAUTH` integration* ([T8](#t8-account-network-policy-blocks-the-spcs-to-cortex-call)). In `hybrid` and `privatelink` the `COMPUTE_POOL` rule replaces T8's NAT range, and in `privatelink` an endpoint-ID rule replaces T7's Cloudflare ranges ([§ 7](teams-private-connectivity.md)). Do not edit the managed `ACCOUNT_VPN_POLICY_SE`.
 
 > **Redact before you screenshot.** Never capture bearer tokens, PATs, client secrets, or HAR/header dumps. Blur tenant, org and account identifiers.
 
 ## 4.1 During install: script and deploy errors
 
-These happen while you run the [install](install.md#2-install-standalone-spcs) and [Teams app](install.md#3-teams-app) steps, before you reach the tab. Entries run in roughly the order of the install. Installed as a Native App? Its extra errors and differences are in [B.5](native-app.md#b5-native-app-failures).
+These happen while you run the [install](teams-install.md#2-install-standalone-spcs) and [Teams app](teams-install.md#3-teams-app) steps, before you reach the tab. Entries run in roughly the order of the install. Installed as a Native App? Its extra errors and differences are in [B.5](teams-native-app.md#b5-native-app-failures).
 
 ### I1. Tenant setup with `az`: "Cannot find user or service principal"
 
@@ -96,7 +96,7 @@ These happen while you run the [install](install.md#2-install-standalone-spcs) a
 
 **Cause.** `:latest` is missing from the image repository the service reads from.
 
-**Fix.** The service reads `IMAGE_REPO`. Push to `/agents_teams_app_db/public/image_repo/agents-teams-app:latest`. (Native App installs read `na_image_repo` instead: see [B5](native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
+**Fix.** The service reads `IMAGE_REPO`. Push to `/agents_teams_app_db/public/image_repo/agents-teams-app:latest`. (Native App installs read `na_image_repo` instead: see [B5](teams-native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
 
 ### I8. Service never READY, `restartCount` keeps climbing
 
@@ -104,13 +104,13 @@ These happen while you run the [install](install.md#2-install-standalone-spcs) a
 
 **Cause.** The image was built for arm64 (Apple Silicon default). SPCS runs amd64.
 
-**Fix.** Rebuild with `--platform linux/amd64`, retag, and push `:latest` to `IMAGE_REPO` ([I7](#i7-397012-image--not-found)), then roll the service with `deploy-spcs.sh`. (Native App: see [B5](native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
+**Fix.** Rebuild with `--platform linux/amd64`, retag, and push `:latest` to `IMAGE_REPO` ([I7](#i7-397012-image--not-found)), then roll the service with `deploy-spcs.sh`. (Native App: see [B5](teams-native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
 
 ### I9. Bootstrap `003001` / `MODIFY` on `AGENTS_TEAMS_EAI`
 
 **Symptom.** Bootstrap fails with `003001` on `MODIFY` for `AGENTS_TEAMS_EAI`.
 
-**Cause.** A leftover EAI from a Native App install ([B.6](native-app.md#b6-tear-down-path-b)) or from another role.
+**Cause.** A leftover EAI from a Native App install ([B.6](teams-native-app.md#b6-tear-down-path-b)) or from another role.
 
 **Fix.** Re-run bootstrap. It takes ownership (`REVOKE CURRENT GRANTS`) and then runs `ALTER`. If it fails with `093154`, see [I10](#i10-bootstrap-093154-copy-current-grants).
 
@@ -120,7 +120,7 @@ These happen while you run the [install](install.md#2-install-standalone-spcs) a
 
 **Cause.** App-owned objects reject `COPY`.
 
-**Fix.** Bootstrap uses `REVOKE CURRENT GRANTS`; re-run it. If that still fails, tear down the Native App ([B.6](native-app.md#b6-tear-down-path-b)) and re-run. Do not `DROP` the leftover while the app owns it.
+**Fix.** Bootstrap uses `REVOKE CURRENT GRANTS`; re-run it. If that still fails, tear down the Native App ([B.6](teams-native-app.md#b6-tear-down-path-b)) and re-run. Do not `DROP` the leftover while the app owns it.
 
 ### I11. `002003` Service `AGENTS_TEAMS` does not exist
 
@@ -136,7 +136,7 @@ These happen while you run the [install](install.md#2-install-standalone-spcs) a
 
 **Cause.** `ALLOWED_ORIGINS` was never written. Production `TEAMS_AUTH_MODE` cannot boot without it.
 
-**Fix.** `ALTER SECRET … ALLOWED_ORIGINS`, then roll with `deploy-spcs.sh`. (Native App: see [B5](native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
+**Fix.** `ALTER SECRET … ALLOWED_ORIGINS`, then roll with `deploy-spcs.sh`. (Native App: see [B5](teams-native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
 
 ### I13. `Cannot find module 'miniflare'` / Wrangler fails at repo root
 
@@ -158,11 +158,11 @@ These happen while you run the [install](install.md#2-install-standalone-spcs) a
 
 **Fix.**
 
-1. Register the subdomain once: dashboard → Workers & Pages → the account's workers.dev subdomain. Or use a custom domain ([B.4](native-app.md#b4-cloudflare-worker)).
+1. Register the subdomain once: dashboard → Workers & Pages → the account's workers.dev subdomain. Or use a custom domain ([B.4](teams-native-app.md#b4-cloudflare-worker)).
 2. Set `EDGE_WORKER_NAME` in `apps/teams/.env` to the Worker that owns `TAB_BASE_HOST` (a `*.workers.dev` host is `<worker>.<subdomain>.workers.dev`).
 3. Re-run `bash apps/teams/scripts/set-edge-secrets.sh`, then `bash apps/teams/scripts/deploy-tab.sh`.
 
-**Verify.** `cd packages/teams-edge && npx wrangler secret list --name <worker>` lists the ten secrets ([B.4](native-app.md#b4-cloudflare-worker)).
+**Verify.** `cd packages/teams-edge && npx wrangler secret list --name <worker>` lists the ten secrets ([B.4](teams-native-app.md#b4-cloudflare-worker)).
 
 ### I15. `set-edge-secrets.sh`: "SNOWFLAKE_PAT is not set"
 
@@ -170,7 +170,7 @@ These happen while you run the [install](install.md#2-install-standalone-spcs) a
 
 <!-- TODO screenshot: terminal showing the SNOWFLAKE_PAT is not set error. -->
 
-**Cause.** The ingress PAT was never minted or pasted into `apps/teams/.env`. The edge Worker uses it as `SPCS_PAT` to authenticate to the SPCS ingress. The same `✗ <NAME> is not set` message covers every value the script requires (`AZURE_TENANT_ID`, `BOT_APP_ID`, `OBO_*`, `SNOWFLAKE_ENTRA_APP_ID`, `TAB_BASE_HOST`); in `privatelink` it stops instead with `NETWORK_MODE=privatelink needs SPCS_BASE=https://<privatelink_ingress_url>` ([§ 7.6](private-connectivity.md#76-edge-in-privatelink-workers-vpc)).
+**Cause.** The ingress PAT was never minted or pasted into `apps/teams/.env`. The edge Worker uses it as `SPCS_PAT` to authenticate to the SPCS ingress. The same `✗ <NAME> is not set` message covers every value the script requires (`AZURE_TENANT_ID`, `BOT_APP_ID`, `OBO_*`, `SNOWFLAKE_ENTRA_APP_ID`, `TAB_BASE_HOST`); in `privatelink` it stops instead with `NETWORK_MODE=privatelink needs SPCS_BASE=https://<privatelink_ingress_url>` ([§ 7.6](teams-private-connectivity.md#76-edge-in-privatelink-workers-vpc)).
 
 **Fix.** Mint a PAT for the service user (the secret is shown **once**):
 
@@ -203,7 +203,7 @@ Paste the `token_secret` into `SNOWFLAKE_PAT=` in `apps/teams/.env` (no whitespa
 2. Set `SPCS_INGRESS_HOST=<that host, no scheme>` in `apps/teams/.env` (in `privatelink`, set `SPCS_BASE=https://<privatelink_ingress_url>` instead).
 3. `bash apps/teams/scripts/set-edge-secrets.sh`, then `bash apps/teams/scripts/deploy-tab.sh`.
 
-**Verify.** Reload the tab. In the browser network panel `GET /api/threads?page_size=20` is 200, and the agent list loads. The edge probe in [install.md § 4](install.md#4-verify) cannot show this fix: it returns `401` before the proxy builds the upstream URL, so it passes even with a placeholder `SPCS_BASE`.
+**Verify.** Reload the tab. In the browser network panel `GET /api/threads?page_size=20` is 200, and the agent list loads. The edge probe in [teams-install.md § 4](teams-install.md#4-verify) cannot show this fix: it returns `401` before the proxy builds the upstream URL, so it passes even with a placeholder `SPCS_BASE`.
 
 ### I18. `set-bot-endpoint.sh`: could not resolve Bot Service
 
@@ -211,7 +211,7 @@ Paste the `token_secret` into `SNOWFLAKE_PAT=` in `apps/teams/.env` (no whitespa
 
 **Cause.** There is no Azure Bot in that tenant, or more than one.
 
-**Fix.** Run `bash apps/teams/scripts/create-bot.sh --apply` ([§ 3](install.md#3-teams-app) step 1), or set `RESOURCE_GROUP` / `BOT_NAME` to pick the right one.
+**Fix.** Run `bash apps/teams/scripts/create-bot.sh --apply` ([§ 3](teams-install.md#3-teams-app) step 1), or set `RESOURCE_GROUP` / `BOT_NAME` to pick the right one.
 
 ### I19. Sideload: `UnableToParseTeamsAppManifest` / `name.short` exceeds 30
 
@@ -219,7 +219,7 @@ Paste the `token_secret` into `SNOWFLAKE_PAT=` in `apps/teams/.env` (no whitespa
 
 **Cause.** Teams caps `name.short` at 30 characters. The committed template uses `Snowflake Agent (Unofficial)`.
 
-**Fix.** Rebuild the zip with `bash packages/teams-manifest/zip.sh`. Confirm `SPCS_INGRESS_HOST` matches the current ingress first ([§ 3](install.md#3-teams-app) step 2).
+**Fix.** Rebuild the zip with `bash packages/teams-manifest/zip.sh`. Confirm `SPCS_INGRESS_HOST` matches the current ingress first ([§ 3](teams-install.md#3-teams-app) step 2).
 
 ### I20. Adding the app to a channel: `BadRequest ... BulkMembershipRequest`
 
@@ -255,7 +255,7 @@ The tab is reachable, but something fails once a user signs in or chats. A fresh
 
 **Cause.** The manifest asks Entra for `api://<TAB_BASE_HOST>/<id>`, but the Entra Application ID URI uses a different host, and/or nothing is deployed at `TAB_BASE_HOST`. "Nothing is here yet" is what a legacy `*.pages.dev` project with no **Production** deployment shows. On a Worker host the equivalent is a Cloudflare 404 or 1042 until the first `deploy-tab.sh`.
 
-**Fix.** Make `TAB_BASE_HOST` / `TAB_BASE_URL` match the registered host (`az ad app show --id <OBO_CLIENT_ID> --query identifierUris`), or add the new host to the registration with `az ad app update --id <OBO_CLIENT_ID> --identifier-uris api://<TAB_BASE_HOST>/<OBO_CLIENT_ID>` (list every URI you want to keep: the flag replaces the set). Then run `set-edge-secrets.sh` and `deploy-tab.sh`, `set-bot-endpoint.sh`, update `ALLOWED_ORIGINS` and roll the service, then `zip.sh` and re-upload the app. Moving off `*.pages.dev` follows the same order; see [§ 6](install.md#6-pages-to-worker-cutover).
+**Fix.** Make `TAB_BASE_HOST` / `TAB_BASE_URL` match the registered host (`az ad app show --id <OBO_CLIENT_ID> --query identifierUris`), or add the new host to the registration with `az ad app update --id <OBO_CLIENT_ID> --identifier-uris api://<TAB_BASE_HOST>/<OBO_CLIENT_ID>` (list every URI you want to keep: the flag replaces the set). Then run `set-edge-secrets.sh` and `deploy-tab.sh`, `set-bot-endpoint.sh`, update `ALLOWED_ORIGINS` and roll the service, then `zip.sh` and re-upload the app. Moving off `*.pages.dev` follows the same order; see [§ 6](teams-install.md#6-pages-to-worker-cutover).
 
 ### T2. Personal tab "Couldn't sign you in"
 
@@ -263,7 +263,7 @@ The tab is reachable, but something fails once a user signs in or chats. A fresh
 
 **Cause.** The edge origin is not the Entra-authorized host.
 
-**Fix.** Reuse the existing Worker (`EDGE_WORKER_NAME`) and `TAB_BASE_HOST`. Do not point the tab at a new custom domain or `*.workers.dev` host until that host is on the Entra app ([§ 6](install.md#6-pages-to-worker-cutover) step 1). Keep `TAB_BASE_URL` and the manifest on that same origin.
+**Fix.** Reuse the existing Worker (`EDGE_WORKER_NAME`) and `TAB_BASE_HOST`. Do not point the tab at a new custom domain or `*.workers.dev` host until that host is on the Entra app ([§ 6](teams-install.md#6-pages-to-worker-cutover) step 1). Keep `TAB_BASE_URL` and the manifest on that same origin.
 
 ### T3. Token exchange fails with AADSTS65005
 
@@ -300,7 +300,7 @@ snow sql --silent --enable-templating none -f temp/alter-teams-secrets.sql
 bash apps/teams/scripts/deploy-spcs.sh
 ```
 
-(Native App: the `CONFIGURE_OAUTH` / `SET_SECRET` / `ROLL_SERVER_SERVICE` calls are in [B5](native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
+(Native App: the `CONFIGURE_OAUTH` / `SET_SECRET` / `ROLL_SERVER_SERVICE` calls are in [B5](teams-native-app.md#b5-native-app-variants-of-the-main-chapter-entries).)
 
 Pointing `CORTEX_TEAMS_OAUTH` at the bot's app id does not cause 65005; it fails later, when Snowflake rejects the token audience. Once the exchange succeeds, a Snowflake `EXTERNAL_OAUTH_USER_CLAIM_MISSING` means the token has no `upn` claim; add it as an optional claim, see [T9](#t9-you-do-not-have-access-to-that-resource).
 
@@ -343,16 +343,16 @@ SHOW USER PROGRAMMATIC ACCESS TOKENS FOR USER "<pat-user>";   -- use the ACTIVE 
 
 ### T6. `/api/*` fails at the edge or the ingress
 
-**Symptom.** The edge probe in [install.md § 4](install.md#4-verify) returns something other than `401 {"error":"Unauthorized"}`, or the tab's own `/api/*` requests fail in the browser network panel. The probe stops at the edge, so it can return only the **probe** rows. The **tab** rows come from requests that carry an edge session and reach the ingress; a direct PAT request also reaches the ingress, from any host the PAT user's network policy allows. Match the result:
+**Symptom.** The edge probe in [teams-install.md § 4](teams-install.md#4-verify) returns something other than `401 {"error":"Unauthorized"}`, or the tab's own `/api/*` requests fail in the browser network panel. The probe stops at the edge, so it can return only the **probe** rows. The **tab** rows come from requests that carry an edge session and reach the ingress; a direct PAT request also reaches the ingress, from any host the PAT user's network policy allows. Match the result:
 
 | Result                                                                                              | Seen on    | Cause                                                                                                                                                                        | Fix                                                                                                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 403`{"error":"Forbidden origin"}`                                                                 | probe      | The`Origin` is not the Worker host.                                                                                                                                        | See[T11](#t11-forbidden-origin-on-api).                                                                                                                                                                                                                                   |
 | 500`Proxy misconfigured: missing SPCS_BASE` (or `SPCS_PAT`, `EDGE_SESSION_SECRET`)            | probe      | That Worker secret is unset.                                                                                                                                                 | `set-edge-secrets.sh`, then `deploy-tab.sh`.                                                                                                                                                                                                                         |
-| 500`{"error":"Edge misconfigured"}`                                                               | probe, tab | On every edge route: a privatelink deploy without the`SPCS_VPC` binding. On `/token/exchange` only: its secrets went to a different Worker.                              | See[PL6](private-connectivity.md#pl6-edge-misconfigured-500-in-privatelink), or [I14](#i14-wrangler-deploy-workersdev-subdomain-or-worker-name).                                                                                                                                                  |
+| 500`{"error":"Edge misconfigured"}`                                                               | probe, tab | On every edge route: a privatelink deploy without the`SPCS_VPC` binding. On `/token/exchange` only: its secrets went to a different Worker.                              | See[PL6](teams-private-connectivity.md#pl6-edge-misconfigured-500-in-privatelink), or [I14](#i14-wrangler-deploy-workersdev-subdomain-or-worker-name).                                                                                                                                                  |
 | 404, or Cloudflare error 1042                                                                       | probe      | No Worker is deployed on that host yet, or`TAB_BASE_HOST` belongs to a different Worker.                                                                                   | See[I14](#i14-wrangler-deploy-workersdev-subdomain-or-worker-name), then `deploy-tab.sh`.                                                                                                                                                                               |
 | 302 to`sfc-endpoint-login-…/sfc-oauth-begin`                                                     | tab        | The ingress saw no valid credential: the edge did not attach a usable`SPCS_PAT`.                                                                                           | `set-edge-secrets.sh`, then `deploy-tab.sh`.                                                                                                                                                                                                                         |
-| 401`Incoming request with IP/Token … is not allowed`                                             | tab        | The PAT user's network policy rejects the edge's address.                                                                                                                    | See[T7](#t7-cloudflare-ip-is-not-allowed-to-access-snowflake) (`public`, `hybrid`) or [PL3](private-connectivity.md#pl3-the-private-ingress-rejects-the-edge-401-or-403) (`privatelink`).                                                                                                   |
+| 401`Incoming request with IP/Token … is not allowed`                                             | tab        | The PAT user's network policy rejects the edge's address.                                                                                                                    | See[T7](#t7-cloudflare-ip-is-not-allowed-to-access-snowflake) (`public`, `hybrid`) or [PL3](teams-private-connectivity.md#pl3-the-private-ingress-rejects-the-edge-401-or-403) (`privatelink`).                                                                                                   |
 | 403`Insufficient privileges to use <ingress>`                                                     | tab        | The`SPCS_PAT` user lacks endpoint access.                                                                                                                                  | Native App:`GRANT APPLICATION ROLE AGENTS_TEAMS_APP.APP_PUBLIC TO USER "<pat-user>"`. Path A: grant `AGENTS_TEAMS!ALL_ENDPOINTS_USAGE` plus `USAGE` on `AGENTS_TEAMS_APP_DB` / `PUBLIC` (quote the SQL, see [I6](#i6-zsh-event-not-found-all_endpoints_usage)). |
 | 500`{"responseType":"FAULT","detail":""}`                                                         | tab        | The ingress rejected`SPCS_PAT` before the container (no service logs). Almost always whitespace in `apps/teams/.env` `SNOWFLAKE_PAT` (JWT signature wrapped on paste). | Strip the spaces, run`set-edge-secrets.sh`, then `deploy-tab.sh`.                                                                                                                                                                                                    |
 | 500, Cloudflare 1101                                                                                | tab        | Placeholder`SPCS_BASE`.                                                                                                                                                    | See[I17](#i17-every-api-call-is-500-cloudflare-1101).                                                                                                                                                                                                                     |
@@ -390,7 +390,7 @@ ALTER USER <pat-user> SET NETWORK_POLICY = AGENTS_TEAMS_INGRESS_POLICY;
 
 Also confirm that the Worker's `SPCS_PAT` is that user's **ACTIVE** token ([T5](#t5-token-expired-at-the-ingress)) and redeploy.
 
-This policy is for `public` and `hybrid`. In `privatelink` the edge reaches the private ingress, so the PAT user gets `AGENTS_TEAMS_PL_INGRESS_POLICY` (private-endpoint IDs, no Cloudflare ranges) instead ([§ 7.4](private-connectivity.md#74-network-sql-accountadmin)). A Cloudflare IP in this error in `privatelink` means the edge is still deployed without `--privatelink`.
+This policy is for `public` and `hybrid`. In `privatelink` the edge reaches the private ingress, so the PAT user gets `AGENTS_TEAMS_PL_INGRESS_POLICY` (private-endpoint IDs, no Cloudflare ranges) instead ([§ 7.4](teams-private-connectivity.md#74-network-sql-accountadmin)). A Cloudflare IP in this error in `privatelink` means the edge is still deployed without `--privatelink`.
 
 **Verify.** Reload the tab: the IP error is gone and the agent list loads. The edge probe cannot show this, because it never reaches the ingress. A direct PAT request from a laptop is blocked by this same policy, as intended.
 
@@ -420,7 +420,7 @@ Allow the `/24`, not the single IP, because the NAT address floats within it. Ne
 
 If `LOGIN_HISTORY` shows a private `10.x` as the blocked `client_ip`, the call took the internal route instead of the public NAT. In `public` mode that means the Cortex URL was built from the injected `SNOWFLAKE_HOST`; `SNOWFLAKE_HOST_MODE=account` (the default) builds it from `SNOWFLAKE_ACCOUNT` (public NAT), so upgrade the app and roll the service rather than editing any policy.
 
-In `hybrid` and `privatelink` the internal route is intentional (`SNOWFLAKE_HOST_MODE=internal`). A NAT `/24` cannot match it; the fix is the `COMPUTE_POOL` network rule on `CORTEX_TEAMS_OAUTH`, which replaces this policy. See [PL1](private-connectivity.md#pl1-390422-after-switching-to-hybrid-or-privatelink).
+In `hybrid` and `privatelink` the internal route is intentional (`SNOWFLAKE_HOST_MODE=internal`). A NAT `/24` cannot match it; the fix is the `COMPUTE_POOL` network rule on `CORTEX_TEAMS_OAUTH`, which replaces this policy. See [PL1](teams-private-connectivity.md#pl1-390422-after-switching-to-hybrid-or-privatelink).
 
 ### T9. You do not have access to that resource
 
@@ -431,9 +431,9 @@ In `hybrid` and `privatelink` the internal route is intentional (`SNOWFLAKE_HOST
 **Cause.** The tab shows `agent_forbidden` for **any** upstream 401/403 (only Snowflake `390422` becomes a network-policy error), so the banner alone does not tell you why. Read the container log first ([Reading the SPCS container log](#reading-the-spcs-container-log)). `CORTEX_TEAMS_OAUTH` could not map the token to a user, for one of two independent reasons:
 
 1. **No Snowflake user for the Entra identity.** No user has a `login_name` equal to the token's `upn`.
-2. **Token has no `upn` claim.** The log shows `Upstream 401: Invalid OAuth access token`. Entra v2 access tokens omit `upn` unless it is added as an optional claim ([install step 6a](install.md#2-install-standalone-spcs)).
+2. **Token has no `upn` claim.** The log shows `Upstream 401: Invalid OAuth access token`. Entra v2 access tokens omit `upn` unless it is added as an optional claim ([install step 6a](teams-install.md#2-install-standalone-spcs)).
 
-**Fix.** For cause 1, create the user ([install step 7](install.md#2-install-standalone-spcs) grants), using the Entra UPN as `login_name`. Ask the user for the UPN; do not guess it. Check by `login_name` first: if a user already has that login under another name, do not create one, and grant `AGENTS_TEAMS_USER` access to that user's default role instead (install step 7).
+**Fix.** For cause 1, create the user ([install step 7](teams-install.md#2-install-standalone-spcs) grants), using the Entra UPN as `login_name`. Ask the user for the UPN; do not guess it. Check by `login_name` first: if a user already has that login under another name, do not create one, and grant `AGENTS_TEAMS_USER` access to that user's default role instead (install step 7).
 
 ```sql
 SHOW USERS;
@@ -447,7 +447,7 @@ GRANT USAGE ON SCHEMA <db>.<schema> TO ROLE AGENTS_TEAMS_USER;
 GRANT USAGE ON AGENT <db>.<schema>.<agent> TO ROLE AGENTS_TEAMS_USER;
 ```
 
-For cause 2, add `upn` as an optional claim on the Snowflake resource app in Entra (Token configuration → Add optional claim → Access → `upn`, and allow the Graph permission prompt), or with the CLI command in [install step 6a](install.md#2-install-standalone-spcs). Only new tokens carry it, so reload the tab. Do **not** widen `EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM` to `email` or `preferred_username`: those are attacker-influenceable and enable account takeover (security review F2). Keep it at `('upn')`.
+For cause 2, add `upn` as an optional claim on the Snowflake resource app in Entra (Token configuration → Add optional claim → Access → `upn`, and allow the Graph permission prompt), or with the CLI command in [install step 6a](teams-install.md#2-install-standalone-spcs). Only new tokens carry it, so reload the tab. Do **not** widen `EXTERNAL_OAUTH_TOKEN_USER_MAPPING_CLAIM` to `email` or `preferred_username`: those are attacker-influenceable and enable account takeover (security review F2). Keep it at `('upn')`.
 
 Reload the tab (no sideload required). If chat then works but a tool is "unavailable", see [T10](#t10-the-agent-says-a-tool-is-unavailable).
 
@@ -527,7 +527,7 @@ A HAR export contains live bearer tokens and edge sessions. Extract metadata onl
 
 ### Seeing the actual edge Worker error
 
-Use this when `/api/*` is 500 and the cause is not obvious (as in [I17](#i17-every-api-call-is-500-cloudflare-1101) or [PL6](private-connectivity.md#pl6-edge-misconfigured-500-in-privatelink)).
+Use this when `/api/*` is 500 and the cause is not obvious (as in [I17](#i17-every-api-call-is-500-cloudflare-1101) or [PL6](teams-private-connectivity.md#pl6-edge-misconfigured-500-in-privatelink)).
 
 <!-- TODO screenshot: `wrangler tail` output showing the "Invalid URL" exception. Redact tokens and hostnames. -->
 

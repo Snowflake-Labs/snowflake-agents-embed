@@ -63,11 +63,11 @@ snowflake/superstore-360/   Sample Superstore data, semantic view and demo agent
 Start at [`docs/install-guide.md`](docs/install-guide.md), then the Teams docs in
 [`docs/teams/`](docs/teams):
 
-- [`install.md`](docs/teams/install.md): standalone SPCS install (default), Teams app sideload,
+- [`teams-install.md`](docs/teams/teams-install.md): standalone SPCS install (default), Teams app sideload,
   verification, teardown, Pages-to-Worker cutover
-- [`troubleshooting.md`](docs/teams/troubleshooting.md): install and tab errors, diagnostics
-- [`private-connectivity.md`](docs/teams/private-connectivity.md): `NETWORK_MODE` `hybrid` / `privatelink`
-- [`native-app.md`](docs/teams/native-app.md): Native App install (Path B)
+- [`teams-troubleshooting.md`](docs/teams/teams-troubleshooting.md): install and tab errors, diagnostics
+- [`teams-private-connectivity.md`](docs/teams/teams-private-connectivity.md): `NETWORK_MODE` `hybrid` / `privatelink`
+- [`teams-native-app.md`](docs/teams/teams-native-app.md): Native App install (Path B)
 
 Scripts live in `apps/teams/scripts/` (`validate-env.sh`, `deploy-spcs.sh`,
 `set-edge-secrets.sh`, `deploy-tab.sh`, `smoke-test.sh`, and more). They read only

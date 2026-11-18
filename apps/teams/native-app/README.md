@@ -13,6 +13,6 @@ Snowflake Agents for Teams (Unofficial) embeds Cortex agent chat in Microsoft Te
    ALTER APPLICATION AGENTS_TEAMS_APP APPROVE SPECIFICATION cortex_and_entra_egress SEQUENCE_NUMBER = <n>;
    ```
 
-Full operator steps (Azure Bot / Entra apps, Cloudflare Worker edge, Teams sideload, verification): start at `docs/install-guide.md`, then `docs/teams/install.md` (Path B: `docs/teams/native-app.md`) in the snowflake-agents-embed repo.
+Full operator steps (Azure Bot / Entra apps, Cloudflare Worker edge, Teams sideload, verification): start at `docs/install-guide.md`, then `docs/teams/teams-install.md` (Path B: `docs/teams/teams-native-app.md`) in the snowflake-agents-embed repo.
 
 The next Marketplace version/patch must include the redacted Entra setup screenshots in `streamlit/img/entra-setup/` (secret Value, Secret ID, and account are covered).

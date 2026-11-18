@@ -1,10 +1,10 @@
 # Teams Native App install (Path B)
 
-Complete the [master install guide](../install-guide.md) and the [prerequisites](install.md#1-extra-prerequisites) first.
+Complete the [master install guide](../install-guide.md) and the [prerequisites](teams-install.md#1-extra-prerequisites) first.
 
-Use this appendix only to package and distribute the app (Provider) or to install a published listing (Consumer). Most installs use the standalone flow in [§ 2](install.md#2-install-standalone-spcs). Everything below is specific to the Native App.
+Use this appendix only to package and distribute the app (Provider) or to install a published listing (Consumer). Most installs use the standalone flow in [§ 2](teams-install.md#2-install-standalone-spcs). Everything below is specific to the Native App.
 
-Differences from [§ 1](install.md#1-extra-prerequisites): fill `SPCS_INGRESS_HOST` / `SPCS_BASE` after the service is READY from wizard tab 9 (9c, Show Endpoint URL) / `GET_SERVER_STATUS`; the Teams Snowflake secret `APPS_API_HOST` is written by the wizard / `CONFIG.SET_SECRET`; the Azure CLI is needed only if you provision a new Entra tenant or Bot resource by hand.
+Differences from [§ 1](teams-install.md#1-extra-prerequisites): fill `SPCS_INGRESS_HOST` / `SPCS_BASE` after the service is READY from wizard tab 9 (9c, Show Endpoint URL) / `GET_SERVER_STATUS`; the Teams Snowflake secret `APPS_API_HOST` is written by the wizard / `CONFIG.SET_SECRET`; the Azure CLI is needed only if you provision a new Entra tenant or Bot resource by hand.
 
 Uses the [master guide § 5](../install-guide.md#5-native-app-path-only) pattern. Do not run `bootstrap-dev-spcs.sql` or `deploy-spcs.sh` on this path.
 
@@ -85,7 +85,7 @@ GRANT APPLICATION ROLE AGENTS_TEAMS_APP.APP_PUBLIC TO USER "AGENTS_TEAMS_SVC";
 
 `AGENTS_TEAMS_SVC` (created above; the standalone bootstrap creates the same user) is the dedicated service user that owns the PAT you will store as the edge Worker secret `SPCS_PAT` in [Cloudflare Worker](#b4-cloudflare-worker) below. Put that username in `apps/teams/.env` as `SNOWFLAKE_USER` and reuse `SNOWFLAKE_PAT` as the ingress token. Grant `APP_PUBLIC` to that user directly (`TO USER`), not only to role `AGENTS_TEAMS_USER` — otherwise edge → ingress returns 403 `Insufficient privileges to use <ingress>`. This is not `TEAMS_USERNAME` (Entra) and not the Cortex identity.
 
-**5. Give each Teams user a Snowflake identity and the agent's grants.** Same SQL as [install step 7](install.md#2-install-standalone-spcs) (once per Entra user, as `ACCOUNTADMIN`); run it after the application roles above.
+**5. Give each Teams user a Snowflake identity and the agent's grants.** Same SQL as [install step 7](teams-install.md#2-install-standalone-spcs) (once per Entra user, as `ACCOUNTADMIN`); run it after the application roles above.
 
 ### Publish the listing (provider, for another account)
 
@@ -176,7 +176,7 @@ If the Entra app and Azure Bot already exist, skip tabs 1–6 and paste the exis
 
 > Catalog → Apps → `AGENTS_TEAMS_APP` → SETUP_WIZARD, tab 1. Skip 1–6 if Entra and the bot already exist.
 
-**Tab 2: Expose an API.** When Azure prompts for the Application ID URI, replace the default `api://<client-id>` with `api://<TAB_BASE_HOST>/<client-id>` (for example `api://teams.example.com/<client-id>`). Teams SSO requires the edge hostname in the URI, and `TAB_BASE_HOST` in `apps/teams/.env` must be that same host, so pick the Worker host first ([Cloudflare Worker](#b4-cloudflare-worker)). A mismatch fails sign-in with `AADSTS500011` ([T1](troubleshooting.md#t1-aadsts500011-and-nothing-is-here-yet)). Scope name `access_as_user`, admins and users can consent. This is the Teams SSO / OBO app, not the Snowflake OAuth resource app that tab 7 asks for.
+**Tab 2: Expose an API.** When Azure prompts for the Application ID URI, replace the default `api://<client-id>` with `api://<TAB_BASE_HOST>/<client-id>` (for example `api://teams.example.com/<client-id>`). Teams SSO requires the edge hostname in the URI, and `TAB_BASE_HOST` in `apps/teams/.env` must be that same host, so pick the Worker host first ([Cloudflare Worker](#b4-cloudflare-worker)). A mismatch fails sign-in with `AADSTS500011` ([T1](teams-troubleshooting.md#t1-aadsts500011-and-nothing-is-here-yet)). Scope name `access_as_user`, admins and users can consent. This is the Teams SSO / OBO app, not the Snowflake OAuth resource app that tab 7 asks for.
 
 **Tab 3: Client secret.** Copy the **Value** immediately; it is shown once. That is **OBO Client Secret**. Application (client) ID from Overview is **OBO Client App ID**.
 
@@ -186,7 +186,7 @@ If the Entra app and Azure Bot already exist, skip tabs 1–6 and paste the exis
 
 **Tab 6: Bot App ID and secret.** Settings → Configuration → Microsoft App ID. Manage Password → new client secret. Copy the Value once.
 
-**Tab 7: Snowflake.** Paste tenant ID, bot + OBO credentials, Snowflake App (OAuth resource) client ID (UUID or `api://…`), Apps API host (`apps-api.c1.<region>.<cloud>.app.snowflake.com`), default agent FQN, optional allow-list, Teams App ID (default `<your-teams-app-id>`). Click **Configure Security Integration**. The integration maps the `upn` claim only; add `upn` as an access-token optional claim on the Snowflake resource app (see [T9](troubleshooting.md#t9-you-do-not-have-access-to-that-resource)) or Cortex returns `agent_forbidden`.
+**Tab 7: Snowflake.** Paste tenant ID, bot + OBO credentials, Snowflake App (OAuth resource) client ID (UUID or `api://…`), Apps API host (`apps-api.c1.<region>.<cloud>.app.snowflake.com`), default agent FQN, optional allow-list, Teams App ID (default `<your-teams-app-id>`). Click **Configure Security Integration**. The integration maps the `upn` claim only; add `upn` as an access-token optional claim on the Snowflake resource app (see [T9](teams-troubleshooting.md#t9-you-do-not-have-access-to-that-resource)) or Cortex returns `agent_forbidden`.
 
 > **This button only `ALTER`s `CORTEX_TEAMS_OAUTH` - it does not create it.** Snowflake Native Apps have no manifest privilege that gets `CREATE SECURITY INTEGRATION` auto-granted to the app (`CREATE INTEGRATION` is rejected outright as an invalid privilege name; declaring `CREATE SECURITY INTEGRATION` under `privileges:` passes manifest validation but is never actually granted at run time — confirmed by testing, not assumed). So on every fresh install, before tab 7's button will work, an `ACCOUNTADMIN` in the consumer's account must run **one** of:
 >
@@ -198,7 +198,7 @@ If the Entra app and Azure Bot already exist, skip tabs 1–6 and paste the exis
 >   REVOKE CREATE INTEGRATION ON ACCOUNT FROM APPLICATION <installed-app-name>;
 >   ```
 >
-> Symptom if you skip this: tab 7's button (or the equivalent `CALL CONFIG.CONFIGURE_OAUTH(...)`) fails with `Integration 'CORTEX_TEAMS_OAUTH' does not exist or not authorized ... The owning application <installed-app-name> must have at least one privilege granted on INTEGRATION CORTEX_TEAMS_OAUTH` — see the troubleshooting table (`093118`, [troubleshooting.md](troubleshooting.md)).
+> Symptom if you skip this: tab 7's button (or the equivalent `CALL CONFIG.CONFIGURE_OAUTH(...)`) fails with `Integration 'CORTEX_TEAMS_OAUTH' does not exist or not authorized ... The owning application <installed-app-name> must have at least one privilege granted on INTEGRATION CORTEX_TEAMS_OAUTH` — see the troubleshooting table (`093118`, [teams-troubleshooting.md](teams-troubleshooting.md)).
 >
 > `<installed-app-name>` is whatever `SHOW APPLICATIONS` shows for this install (for example `SNOWFLAKE_AGENTS_FOR_TEAMS` when installed from a Marketplace listing) — it is **not** always the placeholder `AGENTS_TEAMS_APP` this doc uses elsewhere.
 
@@ -240,11 +240,11 @@ CALL AGENTS_TEAMS_APP.CONFIG.SET_SECRET('APPS_API_HOST', 'apps-api.c1.<region>.<
 
 > Tab 7: tenant, bot, OBO, and Snowflake OAuth resource fields.
 
-**Tab 8: Network.** Leave the mode on **public** (the default) unless the account restricts Snowflake to private connectivity; public needs nothing else on this tab. For **hybrid** and **privatelink**, read [§ 7](private-connectivity.md) first. Pick the mode and click **Save network mode** (`CONFIG.SET_NETWORK_MODE`). The mode only takes effect on the next **Create Service** or **Roll service** on tab 9, and a roll keeps the saved mode. In hybrid and privatelink the tab shows three more steps:
+**Tab 8: Network.** Leave the mode on **public** (the default) unless the account restricts Snowflake to private connectivity; public needs nothing else on this tab. For **hybrid** and **privatelink**, read [§ 7](teams-private-connectivity.md) first. Pick the mode and click **Save network mode** (`CONFIG.SET_NETWORK_MODE`). The mode only takes effect on the next **Create Service** or **Roll service** on tab 9, and a roll keeps the saved mode. In hybrid and privatelink the tab shows three more steps:
 
 - **8a · Detect**: the cloud (from `CURRENT_REGION()`) and the account's PrivateLink configuration. The app usually cannot run `SYSTEM$GET_PRIVATELINK_CONFIG()` itself; run the query it shows as `ACCOUNTADMIN` and paste the JSON back. **Read private ingress URL** shows `privatelink_ingress_url` once the service is running.
-- **8b · Private DNS**: one record per host for your private zone ([§ 7.5](private-connectivity.md#75-private-dns)).
-- **8c · ACCOUNTADMIN SQL**: the compute pool network rule on `CORTEX_TEAMS_OAUTH` and, in privatelink, the endpoint-ID policy on the service PAT user ([§ 7.4](private-connectivity.md#74-network-sql-accountadmin)). Apply it **before** Create Service or Roll service, or every user call fails with `390422`.
+- **8b · Private DNS**: one record per host for your private zone ([§ 7.5](teams-private-connectivity.md#75-private-dns)).
+- **8c · ACCOUNTADMIN SQL**: the compute pool network rule on `CORTEX_TEAMS_OAUTH` and, in privatelink, the endpoint-ID policy on the service PAT user ([§ 7.4](teams-private-connectivity.md#74-network-sql-accountadmin)). Apply it **before** Create Service or Roll service, or every user call fails with `390422`.
 
 SQL path: `CALL AGENTS_TEAMS_APP.CONFIG.SET_NETWORK_MODE('hybrid');` (`public`, `hybrid` or `privatelink`) and `CALL AGENTS_TEAMS_APP.CONFIG.GET_NETWORK_MODE();`. A value outside those three returns a `refuse:` string and changes nothing.
 
@@ -254,7 +254,7 @@ The edge Worker does **not** need to exist yet to complete this tab. Its hostnam
 
 1. **9a · CDN domain**: the edge hostname (`teams.example.com`) or `https://teams.example.com` (no path). Same origin as `TAB_BASE_HOST`. A self-hosted edge uses its own public hostname here.
 2. **9b · Create Service**: `CONFIG.CREATE_SERVER_SERVICE` + `CONFIG.GRANT_ENDPOINT_ACCESS`. The procedure accepts the origin string or the bare hostname. It applies `services/service_spec.yml` in public mode and `services/service_spec_private.yml` in hybrid and privatelink. It also writes `CONFIG.ALLOWED_ORIGINS` from that origin. Production `TEAMS_AUTH_MODE` refuses to boot without it, and the container exits `1` (`Missing required environment variable: ALLOWED_ORIGINS`). Wait until `GET_SERVER_STATUS` shows `READY` (often ~60s). Approve `cortex_and_entra_egress` only if `SHOW PENDING SPECIFICATIONS` still has a row. **Roll service** remounts the container after a secret or network mode change. If it reports a new ingress host, update `SPCS_BASE` as in step 3.
-3. **9c · Show Endpoint URL**: shows the public ingress and, on an account with PrivateLink, the private ingress (`privatelink_ingress_url`). The edge secret `SPCS_BASE` is the public ingress in public and hybrid, and the private ingress copied verbatim in privatelink. Do **not** put it in `VITE_SPCS_BASE`. Do **not** use it as the Azure Bot messaging endpoint (`https://<TAB_BASE_HOST>/api/bot/messages`). `CREATE_SERVER_SERVICE` drops and recreates the service, so the ingress hostname **changes every install**. Copy the public ingress host into `apps/teams/.env` `SPCS_INGRESS_HOST` (no scheme) before [§ 3](install.md#3-teams-app) `zip.sh`; in privatelink the manifest leaves it out and it may stay empty.
+3. **9c · Show Endpoint URL**: shows the public ingress and, on an account with PrivateLink, the private ingress (`privatelink_ingress_url`). The edge secret `SPCS_BASE` is the public ingress in public and hybrid, and the private ingress copied verbatim in privatelink. Do **not** put it in `VITE_SPCS_BASE`. Do **not** use it as the Azure Bot messaging endpoint (`https://<TAB_BASE_HOST>/api/bot/messages`). `CREATE_SERVER_SERVICE` drops and recreates the service, so the ingress hostname **changes every install**. Copy the public ingress host into `apps/teams/.env` `SPCS_INGRESS_HOST` (no scheme) before [§ 3](teams-install.md#3-teams-app) `zip.sh`; in privatelink the manifest leaves it out and it may stay empty.
 
 ```sql
 CALL AGENTS_TEAMS_APP.CONFIG.CREATE_SERVER_SERVICE('https://teams.example.com');
@@ -278,7 +278,7 @@ Leave [`packages/tab/.env.production`](../../packages/tab/.env.production) `VITE
 Pick the host:
 
 - **Custom domain (recommended)**: needs a zone on the same Cloudflare account. After the first deploy, add it under the Worker → **Settings** → **Domains & Routes** → **Add** → **Custom domain**, or set `EDGE_CUSTOM_DOMAIN=teams.example.com` in `apps/teams/.env` so `deploy-tab.sh` adds the route on every deploy.
-- **workers.dev**: `<worker-name>.<your-subdomain>.workers.dev`. Register the account's workers.dev subdomain once in the dashboard (Workers & Pages), or the first deploy fails ([I14](troubleshooting.md#i14-wrangler-deploy-workersdev-subdomain-or-worker-name)).
+- **workers.dev**: `<worker-name>.<your-subdomain>.workers.dev`. Register the account's workers.dev subdomain once in the dashboard (Workers & Pages), or the first deploy fails ([I14](teams-troubleshooting.md#i14-wrangler-deploy-workersdev-subdomain-or-worker-name)).
 
 Either way the host must be **the same origin** as:
 
@@ -286,7 +286,7 @@ Either way the host must be **the same origin** as:
 - `apps/teams/.env` `TAB_BASE_HOST` / `TAB_BASE_URL` (manifest `contentUrl` via `zip.sh`)
 - the Entra / Teams SSO app's Application ID URI, `api://<TAB_BASE_HOST>/<OBO_CLIENT_ID>` (check with `az ad app show --id <OBO_CLIENT_ID> --query identifierUris`). The manifest `webApplicationInfo.resource` is built from `TAB_BASE_HOST`, so a different host is `AADSTS500011`
 
-A **new** hostname that Entra does not already authorize fails tab SSO with the generic "Couldn't sign you in" banner. Reuse the host that is already on the Entra app (`TAB_BASE_HOST`), or add the new one first ([§ 6](install.md#6-pages-to-worker-cutover) step 1). Moving from an existing `*.pages.dev` install follows [§ 6](install.md#6-pages-to-worker-cutover).
+A **new** hostname that Entra does not already authorize fails tab SSO with the generic "Couldn't sign you in" banner. Reuse the host that is already on the Entra app (`TAB_BASE_HOST`), or add the new one first ([§ 6](teams-install.md#6-pages-to-worker-cutover) step 1). Moving from an existing `*.pages.dev` install follows [§ 6](teams-install.md#6-pages-to-worker-cutover).
 
 Set the runtime secrets, then deploy. [`apps/teams/scripts/set-edge-secrets.sh`](../../apps/teams/scripts/set-edge-secrets.sh) sends all 10 from `apps/teams/.env` in one `wrangler secret bulk` call (`AZURE_TENANT_ID`, `OBO_CLIENT_ID`, `OBO_CLIENT_SECRET`, `SNOWFLAKE_SCOPE`, `ENTRA_AUDIENCE_URI`, `SPCS_BASE`, `SPCS_PAT`, `EDGE_SESSION_SECRET`, `BOT_LINK_SECRET`, `BOT_APP_ID`). It generates `EDGE_SESSION_SECRET` and `BOT_LINK_SECRET` into `.env` if they are absent. On a first install Wrangler asks whether to create the Worker so it can hold the secrets; answer yes, and the deploy replaces that placeholder and keeps the secrets. The script does not deploy, so run `deploy-tab.sh` after it:
 
@@ -310,11 +310,11 @@ After rotating a secret, run `deploy-tab.sh` again so warm isolates pick up the 
 
 The wizard needs the edge hostname before Create Service; the Worker needs `SPCS_BASE` and `SPCS_PAT` after the ingress exists. Decide the host, put it in wizard tab 9, start the service, then set the secrets and deploy.
 
-Continue at [§ 3](install.md#3-teams-app).
+Continue at [§ 3](teams-install.md#3-teams-app).
 
 ## B.5 Native App failures
 
-Errors that only occur on a Native App install (B1 to B4), then the Native App variants of entries in [troubleshooting.md](troubleshooting.md) (B5).
+Errors that only occur on a Native App install (B1 to B4), then the Native App variants of entries in [teams-troubleshooting.md](teams-troubleshooting.md) (B5).
 
 ### B1. `093118`: `CREATE INTEGRATION` cannot be granted
 
@@ -361,7 +361,7 @@ ALTER APPLICATION AGENTS_TEAMS_APP APPROVE SPECIFICATION cortex_and_entra_egress
 
 ### B5. Native App variants of the main-chapter entries
 
-Use these in place of the matching fix in [troubleshooting.md](troubleshooting.md) when the service came from the Native App.
+Use these in place of the matching fix in [teams-troubleshooting.md](teams-troubleshooting.md) when the service came from the Native App.
 
 - **I3 (Docker):** the `docker build` in [B.1](#b1-deploy-the-native-app) fails the same way; same fix.
 - **I4 (`<IMAGE_REPO>`):** copy `repository_url` from the `NA_IMAGE_REPO` row, not `IMAGE_REPO`.
@@ -407,7 +407,7 @@ DROP LISTING AGENTS_TEAMS_LISTING;
 DROP APPLICATION PACKAGE IF EXISTS AGENTS_TEAMS_PACKAGE;
 ```
 
-A leftover package does not block [the standalone install](install.md#2-install-standalone-spcs). Continue bootstrap as soon as the application is gone.
+A leftover package does not block [the standalone install](teams-install.md#2-install-standalone-spcs). Continue bootstrap as soon as the application is gone.
 
 Then drop leftovers the CLI does not own:
 
@@ -429,4 +429,4 @@ Keep `AGENTS_TEAMS_APP_DB` and `NA_IMAGE_REPO` so the next [push](#b1-deploy-the
 
 The PAT that the edge presents to the ingress (`SPCS_PAT`) must belong to a user whose **user-level** network policy allows the edge's egress (Cloudflare IPs in public and hybrid, the private endpoint IDs through `AGENTS_TEAMS_PL_INGRESS_POLICY` in privatelink), and that user needs `APP_PUBLIC` (endpoint usage) on the installed app (`GRANT APPLICATION ROLE … TO USER`, not only to `AGENTS_TEAMS_USER`). Keep that policy restricted across reinstalls.
 
-`--cascade` does not uninstall the Teams sideload, delete the edge Worker (or a legacy Pages project), or drop the `AGENTS_TEAMS_NETWORK` policies from [§ 7](private-connectivity.md). Uninstall the sideload from the Teams UI before the next run if you want a clean personal-app install. Leave Azure app registrations and the Worker in place; to remove private connectivity as well, follow [§ 7.8](private-connectivity.md#78-tear-down-private-connectivity).
+`--cascade` does not uninstall the Teams sideload, delete the edge Worker (or a legacy Pages project), or drop the `AGENTS_TEAMS_NETWORK` policies from [§ 7](teams-private-connectivity.md). Uninstall the sideload from the Teams UI before the next run if you want a clean personal-app install. Leave Azure app registrations and the Worker in place; to remove private connectivity as well, follow [§ 7.8](teams-private-connectivity.md#78-tear-down-private-connectivity).

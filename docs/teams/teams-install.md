@@ -2,11 +2,11 @@
 
 Complete the [master install guide](../install-guide.md) first.
 
-Operator path for Snowflake Agents for Teams (Unofficial): SPCS server, the edge Cloudflare Worker (the Worker that owns `TAB_BASE_HOST`), Teams tab + bot. This guide installs the standalone SPCS service (**Path A**; the Native App is Path B). Packaging the Native App for distribution, or installing a published listing? Use [native-app.md](native-app.md) instead.
+Operator path for Snowflake Agents for Teams (Unofficial): SPCS server, the edge Cloudflare Worker (the Worker that owns `TAB_BASE_HOST`), Teams tab + bot. This guide installs the standalone SPCS service (**Path A**; the Native App is Path B). Packaging the Native App for distribution, or installing a published listing? Use [teams-native-app.md](teams-native-app.md) instead.
 
 The Teams tab and the edge Worker share one origin, so the Single Page Application (SPA) stays on relative `/api/*` and the Worker attaches `SPCS_PAT` and `SPCS_BASE` server-side. See [`packages/tab/.env.production`](../../packages/tab/.env.production) and [`packages/teams-edge/src/core/api-proxy.ts`](../../packages/teams-edge/src/core/api-proxy.ts). Auth modes and token lifetime: [authentication-patterns.md](../authentication-patterns.md).
 
-Already on a `*.pages.dev` host from an earlier install? It keeps working; move to a Worker with [§ 6](#6-pages-to-worker-cutover). Need Snowflake to stay off the public internet? The default install is `NETWORK_MODE=public`; [private-connectivity.md](private-connectivity.md) adds `hybrid` and `privatelink`.
+Already on a `*.pages.dev` host from an earlier install? It keeps working; move to a Worker with [§ 6](#6-pages-to-worker-cutover). Need Snowflake to stay off the public internet? The default install is `NETWORK_MODE=public`; [teams-private-connectivity.md](teams-private-connectivity.md) adds `hybrid` and `privatelink`.
 
 ## Contents
 
@@ -19,9 +19,9 @@ Already on a `*.pages.dev` host from an earlier install? It keeps working; move 
 
 Other Teams docs:
 
-- [troubleshooting.md](troubleshooting.md): install errors (I1 to I21), tab errors (T1 to T14), diagnostics
-- [private-connectivity.md](private-connectivity.md): `hybrid` and `privatelink` network modes (optional)
-- [native-app.md](native-app.md): Native App install (Path B)
+- [teams-troubleshooting.md](teams-troubleshooting.md): install errors (I1 to I21), tab errors (T1 to T14), diagnostics
+- [teams-private-connectivity.md](teams-private-connectivity.md): `hybrid` and `privatelink` network modes (optional)
+- [teams-native-app.md](teams-native-app.md): Native App install (Path B)
 
 ---
 
@@ -32,9 +32,9 @@ Other Teams docs:
 | Wrangler           | `npx wrangler login` once. Invoke Wrangler from [`packages/teams-edge`](../../packages/teams-edge). Root-level `npx wrangler` is not the supported entry                   |
 | Azure CLI (`az`) | Used by `create-bot.sh`, `set-bot-endpoint.sh` and `rotate-entra-secret.sh`. Always`az login --tenant "$AZURE_TENANT_ID"` from `apps/teams/.env` — do not use another tenant’s subscription |
 
-- **Cloudflare** account for the edge Worker. If `TAB_BASE_HOST` will be a `*.workers.dev` host, register the account's workers.dev subdomain once (dashboard: Workers & Pages); a custom domain needs a zone on the same account ([B.4](native-app.md#b4-cloudflare-worker)).
+- **Cloudflare** account for the edge Worker. If `TAB_BASE_HOST` will be a `*.workers.dev` host, register the account's workers.dev subdomain once (dashboard: Workers & Pages); a custom domain needs a zone on the same account ([B.4](teams-native-app.md#b4-cloudflare-worker)).
 - **Microsoft tenant** in `apps/teams/.env` `AZURE_TENANT_ID`. Every Azure CLI step (bot creation, bot endpoint, Entra) uses that value.
-- The PAT’s **user-level** network policy must allow SPCS egress and Cloudflare egress (`public` and `hybrid`; `privatelink` uses private-endpoint IDs instead, [§ 7](private-connectivity.md)).
+- The PAT’s **user-level** network policy must allow SPCS egress and Cloudflare egress (`public` and `hybrid`; `privatelink` uses private-endpoint IDs instead, [§ 7](teams-private-connectivity.md)).
 
 Minimum `apps/teams/.env` for Teams / Cloudflare Worker:
 
@@ -43,7 +43,7 @@ Minimum `apps/teams/.env` for Teams / Cloudflare Worker:
 - `EDGE_WORKER_NAME` (optional): the Worker to deploy to. Blank falls back to a legacy `PAGES_PROJECT`, then the first label of a `*.workers.dev` `TAB_BASE_HOST`, then `agents-embed-teams`.
 - `SNOWFLAKE_ENTRA_APP_ID` (Snowflake OAuth resource app), `DEFAULT_AGENT_FQN`, `APPS_API_HOST`
 - `SNOWFLAKE_USER` / `SNOWFLAKE_PAT`: the service user (`AGENTS_TEAMS_SVC`) and its PAT. That PAT becomes the Worker secret `SPCS_PAT`.
-- `SPCS_INGRESS_HOST` / `SPCS_BASE`: fill these in after the service is READY (`SHOW ENDPOINTS`). `set-edge-secrets.sh` and `zip.sh` need them. In `privatelink`, `SPCS_BASE` is required and is the `privatelink_ingress_url` ([§ 7](private-connectivity.md)).
+- `SPCS_INGRESS_HOST` / `SPCS_BASE`: fill these in after the service is READY (`SHOW ENDPOINTS`). `set-edge-secrets.sh` and `zip.sh` need them. In `privatelink`, `SPCS_BASE` is required and is the `privatelink_ingress_url` ([§ 7](teams-private-connectivity.md)).
 - Teams Snowflake secret (`APPS_API_HOST`): written with `ALTER SECRET` on `AGENTS_TEAMS_APP_DB.CONFIG.APPS_API_HOST` (install step 3).
 
 `APPS_API_HOST` is `apps-api.c1.<region>.<cloud>.app.snowflake.com` (for example `apps-api.c1.eu-west-2.aws.app.snowflake.com`). There's no SQL function that returns it directly — run `SELECT CURRENT_REGION();` (e.g. `AWS_EU_WEST_2`), lowercase the part before the first `_` as `<cloud>` and the rest with `_` → `-` as `<region>`, then substitute into the template above. `c1` is a deployment "cell" and is correct for the vast majority of accounts; if the security integration is configured but the bot can't resolve/call it, confirm the real value in Snowsight's browser DevTools → Network tab (any Native Apps/Marketplace page) by finding the host of the `apps-api...` requests Snowsight itself makes. `SNOWFLAKE_SCOPE` must be lowercase `api://<id>/session:role-any`.
@@ -56,7 +56,7 @@ Minimum `apps/teams/.env` for Teams / Cloudflare Worker:
 
 ## 2. Install (standalone SPCS)
 
-These scripts roll the standalone service `AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS`. Already installed as a Native App in this account? Remove it first ([B.6](native-app.md#b6-tear-down-path-b)): its app-owned `AGENTS_TEAMS_EAI` blocks the bootstrap ([I9](troubleshooting.md#i9-bootstrap-003001--modify-on-agents_teams_eai), [I10](troubleshooting.md#i10-bootstrap-093154-copy-current-grants)).
+These scripts roll the standalone service `AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS`. Already installed as a Native App in this account? Remove it first ([B.6](teams-native-app.md#b6-tear-down-path-b)): its app-owned `AGENTS_TEAMS_EAI` blocks the bootstrap ([I9](teams-troubleshooting.md#i9-bootstrap-003001--modify-on-agents_teams_eai), [I10](teams-troubleshooting.md#i10-bootstrap-093154-copy-current-grants)).
 
 **1. Bootstrap** account objects with [`apps/teams/scripts/bootstrap-dev-spcs.sql`](../../apps/teams/scripts/bootstrap-dev-spcs.sql) (ACCOUNTADMIN section): database, `IMAGE_REPO`, compute pool, Entra+Cortex EAI, empty secrets, placeholder `CORTEX_TEAMS_OAUTH`, role `AGENTS_TEAMS_USER`, service user `AGENTS_TEAMS_SVC`.
 
@@ -139,19 +139,19 @@ docker tag agents-teams-app:latest <IMAGE_REPO>/agents-teams-app:latest
 docker push <IMAGE_REPO>/agents-teams-app:latest
 ```
 
-**5. Create the service** as **SYSADMIN** (not ACCOUNTADMIN). SYSADMIN needs `READ` on all 12 `AGENTS_TEAMS_APP_DB.CONFIG` secrets; the bootstrap grants it. An account bootstrapped before that grant existed fails with [I21](troubleshooting.md#i21-create-service-secret--does-not-exist-or-not-authorized). The GRANT statements below only work after this exists. In [`apps/teams/scripts/create-dev-service.sql`](../../apps/teams/scripts/create-dev-service.sql) replace `REPLACE_WITH_TAB_BASE_HOST` with `TAB_BASE_HOST` (no scheme), then:
+**5. Create the service** as **SYSADMIN** (not ACCOUNTADMIN). SYSADMIN needs `READ` on all 12 `AGENTS_TEAMS_APP_DB.CONFIG` secrets; the bootstrap grants it. An account bootstrapped before that grant existed fails with [I21](teams-troubleshooting.md#i21-create-service-secret--does-not-exist-or-not-authorized). The GRANT statements below only work after this exists. In [`apps/teams/scripts/create-dev-service.sql`](../../apps/teams/scripts/create-dev-service.sql) replace `REPLACE_WITH_TAB_BASE_HOST` with `TAB_BASE_HOST` (no scheme), then:
 
 ```bash
 snow sql -f apps/teams/scripts/create-dev-service.sql
 ```
 
-Installing in `hybrid` or `privatelink`? Apply the network SQL and edit the spec first ([§ 7.3](private-connectivity.md#73-path-a-standalone-spcs)), or every user call fails with `390422`.
+Installing in `hybrid` or `privatelink`? Apply the network SQL and edit the spec first ([§ 7.3](teams-private-connectivity.md#73-path-a-standalone-spcs)), or every user call fails with `390422`.
 
 That file also grants `ALL_ENDPOINTS_USAGE` and runs `SHOW ENDPOINTS`. zsh treats `!` as history expansion — if you paste the GRANTs yourself, use single quotes, not `snow sql -q "…!ALL_ENDPOINTS_USAGE"`.
 
-Copy `ingress_url` into `apps/teams/.env` `SPCS_INGRESS_HOST` (no scheme) and `SPCS_BASE` (`https://…`) before [§ 3](#3-teams-app) `zip.sh`. In `privatelink`, `SPCS_BASE` is `https://` plus `privatelink_ingress_url` instead. Leaving the `.env.example` placeholder here makes every `/api/*` call 500 later ([I17](troubleshooting.md#i17-every-api-call-is-500-cloudflare-1101)).
+Copy `ingress_url` into `apps/teams/.env` `SPCS_INGRESS_HOST` (no scheme) and `SPCS_BASE` (`https://…`) before [§ 3](#3-teams-app) `zip.sh`. In `privatelink`, `SPCS_BASE` is `https://` plus `privatelink_ingress_url` instead. Leaving the `.env.example` placeholder here makes every `/api/*` call 500 later ([I17](teams-troubleshooting.md#i17-every-api-call-is-500-cloudflare-1101)).
 
-**5a. Allow Cloudflare to reach the ingress** (`public` and `hybrid`). Once the service exists and `SNOWFLAKE_USER` in `apps/teams/.env` names the PAT user, attach the Cloudflare-range policy to that user. Without it every Worker call fails with `390422` ([T7](troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake)), and `smoke-test.sh` now fails on a PAT user with no user-level policy.
+**5a. Allow Cloudflare to reach the ingress** (`public` and `hybrid`). Once the service exists and `SNOWFLAKE_USER` in `apps/teams/.env` names the PAT user, attach the Cloudflare-range policy to that user. Without it every Worker call fails with `390422` ([T7](teams-troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake)), and `smoke-test.sh` now fails on a PAT user with no user-level policy.
 
 ```bash
 bash apps/teams/scripts/set-svc-network-policy.sh --apply
@@ -163,7 +163,7 @@ bash apps/teams/scripts/set-svc-network-policy.sh --apply
 bash apps/teams/scripts/deploy-spcs.sh
 ```
 
-**6a. Set token version 2 and add the `upn` optional claim on the Snowflake resource app.** The resource app must issue v2 tokens, and v2 tokens carry no `upn` unless requested. Without it Snowflake rejects the token (`Invalid OAuth access token`) and the tab shows `agent_forbidden` ([T9](troubleshooting.md#t9-you-do-not-have-access-to-that-resource)). Check, then fix if needed (this edits tenant config):
+**6a. Set token version 2 and add the `upn` optional claim on the Snowflake resource app.** The resource app must issue v2 tokens, and v2 tokens carry no `upn` unless requested. Without it Snowflake rejects the token (`Invalid OAuth access token`) and the tab shows `agent_forbidden` ([T9](teams-troubleshooting.md#t9-you-do-not-have-access-to-that-resource)). Check, then fix if needed (this edits tenant config):
 
 ```bash
 az ad app show --id "$SNOWFLAKE_ENTRA_APP_ID" \
@@ -178,7 +178,7 @@ Use `--requested-access-token-version 2`. `--set api.requestedAccessTokenVersion
 
 Only new tokens carry the claim; reload the tab afterwards.
 
-**7. Give each Teams user a Snowflake identity and the agent's grants.** The per-user token is checked against `CORTEX_TEAMS_OAUTH`, which maps the Entra `upn` claim (only; `email` and `preferred_username` are user-editable and not accepted) to a Snowflake `login_name`. No matching user means `agent_forbidden` ([T9](troubleshooting.md#t9-you-do-not-have-access-to-that-resource)). A user without the agent's grants gets a chat that works but tools that are "not available" ([T10](troubleshooting.md#t10-the-agent-says-a-tool-is-unavailable)). Run this once per Entra user, as `ACCOUNTADMIN`:
+**7. Give each Teams user a Snowflake identity and the agent's grants.** The per-user token is checked against `CORTEX_TEAMS_OAUTH`, which maps the Entra `upn` claim (only; `email` and `preferred_username` are user-editable and not accepted) to a Snowflake `login_name`. No matching user means `agent_forbidden` ([T9](teams-troubleshooting.md#t9-you-do-not-have-access-to-that-resource)). A user without the agent's grants gets a chat that works but tools that are "not available" ([T10](teams-troubleshooting.md#t10-the-agent-says-a-tool-is-unavailable)). Run this once per Entra user, as `ACCOUNTADMIN`:
 
 First check whether the person already has a Snowflake user under another name. `CREATE USER IF NOT EXISTS` only matches the user **name**, so an existing user with the same `login_name` makes it fail:
 
@@ -230,7 +230,7 @@ bash apps/teams/scripts/deploy-tab.sh            # privatelink: deploy-tab.sh --
 
 ## 3. Teams app
 
-1. **Azure Bot messaging endpoint** (needs an Azure Bot Service in `AZURE_TENANT_ID`; create it with `bash apps/teams/scripts/create-bot.sh --apply` if none exists. The personal tab works without it, but adding the app to a channel or chat fails with [`BulkMembershipRequest`](troubleshooting.md#i20-adding-the-app-to-a-channel-badrequest--bulkmembershiprequest) without a bot): Settings → Configuration → Messaging endpoint:
+1. **Azure Bot messaging endpoint** (needs an Azure Bot Service in `AZURE_TENANT_ID`; create it with `bash apps/teams/scripts/create-bot.sh --apply` if none exists. The personal tab works without it, but adding the app to a channel or chat fails with [`BulkMembershipRequest`](teams-troubleshooting.md#i20-adding-the-app-to-a-channel-badrequest--bulkmembershiprequest) without a bot): Settings → Configuration → Messaging endpoint:
 
    `https://<TAB_BASE_HOST>/api/bot/messages`
 
@@ -274,7 +274,7 @@ bash apps/teams/scripts/deploy-tab.sh            # privatelink: deploy-tab.sh --
 
    `zip.sh` runs `generate.mjs`, which writes a gitignored `manifest.json` from `apps/teams/.env` (`TEAMS_APP_ID`, `BOT_APP_ID`, `TAB_BASE_HOST`, `SPCS_INGRESS_HOST`). Update `SPCS_INGRESS_HOST` first (`SHOW ENDPOINTS IN SERVICE AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS`). A leftover hostname from a previous install will not match the new ingress. With `NETWORK_MODE=privatelink` in `apps/teams/.env`, `generate.mjs` leaves `SPCS_INGRESS_HOST` out of `validDomains` (Teams never loads the private ingress) and does not need it.
 3. Open the **personal tab**. Teams SSO → Entra JWT → edge `/token/exchange` (OBO) → Snowflake-audience token → same-origin `/api/*`. Hard-refresh Teams (Cmd+Shift+R) after a sideload.
-4. **Test the bot.** The tab passing does not prove the bot works: the bot path has its own JWT check at the edge. In a **channel or group chat** that has the app, @mention it (for example `@Snowflake Agent (Unofficial) revenue in 2023`). A user who has not linked yet gets a **sign-in card**; open the personal tab once, then @mention again to get an answer. No reply at all is [T13](troubleshooting.md#t13-the-bot-gets-no-reply). A 1:1 chat with the bot shows a Teams 404 `Conversation was not found`: that is expected ([T14](troubleshooting.md#t14-11-chat-with-the-bot-shows-conversation-was-not-found)).
+4. **Test the bot.** The tab passing does not prove the bot works: the bot path has its own JWT check at the edge. In a **channel or group chat** that has the app, @mention it (for example `@Snowflake Agent (Unofficial) revenue in 2023`). A user who has not linked yet gets a **sign-in card**; open the personal tab once, then @mention again to get an answer. No reply at all is [T13](teams-troubleshooting.md#t13-the-bot-gets-no-reply). A 1:1 chat with the bot shows a Teams 404 `Conversation was not found`: that is expected ([T14](teams-troubleshooting.md#t14-11-chat-with-the-bot-shows-conversation-was-not-found)).
 
 ---
 
@@ -289,15 +289,15 @@ curl -sS -w '\n%{http_code}\n' -H "Origin: https://<TAB_BASE_HOST>" \
   https://<TAB_BASE_HOST>/api/threads
 ```
 
-This probe stops at the edge. With no `X-Edge-Session` the Worker answers `401` itself and never calls SPCS. A `401` proves that the Worker is deployed on that host, that `SPCS_BASE`, `SPCS_PAT` and `EDGE_SESSION_SECRET` are set, and that the `Origin` is allowed. It does not prove that `SPCS_BASE` is the right URL or that the ingress accepts the PAT. Those show up only on calls that reach the ingress: the tab's own `/api/*` requests (browser network panel), or a direct PAT request to the ingress from a host the PAT user's network policy allows. Match either result in [T6](troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress).
+This probe stops at the edge. With no `X-Edge-Session` the Worker answers `401` itself and never calls SPCS. A `401` proves that the Worker is deployed on that host, that `SPCS_BASE`, `SPCS_PAT` and `EDGE_SESSION_SECRET` are set, and that the `Origin` is allowed. It does not prove that `SPCS_BASE` is the right URL or that the ingress accepts the PAT. Those show up only on calls that reach the ingress: the tab's own `/api/*` requests (browser network panel), or a direct PAT request to the ingress from a host the PAT user's network policy allows. Match either result in [T6](teams-troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress).
 
-Anything else fails? See [troubleshooting.md](troubleshooting.md).
+Anything else fails? See [teams-troubleshooting.md](teams-troubleshooting.md).
 
 ---
 
 ## 5. Tear down
 
-Installed as a Native App? Use [B.6](native-app.md#b6-tear-down-path-b) instead; do **not** run `snow app teardown` for this install.
+Installed as a Native App? Use [B.6](teams-native-app.md#b6-tear-down-path-b) instead; do **not** run `snow app teardown` for this install.
 
 Do **not** run `snow app teardown`. Drop the standalone objects:
 
@@ -311,7 +311,7 @@ DROP EXTERNAL ACCESS INTEGRATION IF EXISTS AGENTS_TEAMS_EAI;
 
 Keep `AGENTS_TEAMS_APP_DB` and `IMAGE_REPO` so the next [push](#2-install-standalone-spcs) has a registry. Keep Cortex agents, `AGENTS_TEAMS_USER`, and `AGENTS_TEAMS_SVC`. Reinstall from [§ 2](#2-install-standalone-spcs).
 
-`AGENTS_TEAMS_SPCS_POLICY` and `AGENTS_TEAMS_INGRESS_POLICY` are **not** created by `bootstrap-dev-spcs.sql`. `set-svc-network-policy.sh` creates the latter, and you create either by hand when [T7 or T8](troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake) (see also [T8](troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call)) appears. If you did, and you want a clean slate, detach then drop them (drop the integration or user first, otherwise Snowflake refuses because the policy is still in use):
+`AGENTS_TEAMS_SPCS_POLICY` and `AGENTS_TEAMS_INGRESS_POLICY` are **not** created by `bootstrap-dev-spcs.sql`. `set-svc-network-policy.sh` creates the latter, and you create either by hand when [T7 or T8](teams-troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake) (see also [T8](teams-troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call)) appears. If you did, and you want a clean slate, detach then drop them (drop the integration or user first, otherwise Snowflake refuses because the policy is still in use):
 
 ```sql
 ALTER SECURITY INTEGRATION IF EXISTS CORTEX_TEAMS_OAUTH UNSET NETWORK_POLICY;
@@ -320,7 +320,7 @@ DROP NETWORK POLICY IF EXISTS AGENTS_TEAMS_SPCS_POLICY;
 DROP NETWORK POLICY IF EXISTS AGENTS_TEAMS_INGRESS_POLICY;
 ```
 
-If you keep the install, re-attach after a reinstall that recreates the integration: `ALTER SECURITY INTEGRATION CORTEX_TEAMS_OAUTH SET NETWORK_POLICY = AGENTS_TEAMS_SPCS_POLICY;`. Per-user Snowflake users created in [install step 7](#2-install-standalone-spcs) are not dropped by teardown. If you ran the `hybrid` or `privatelink` network SQL, also drop its objects ([§ 7.8](private-connectivity.md#78-tear-down-private-connectivity)).
+If you keep the install, re-attach after a reinstall that recreates the integration: `ALTER SECURITY INTEGRATION CORTEX_TEAMS_OAUTH SET NETWORK_POLICY = AGENTS_TEAMS_SPCS_POLICY;`. Per-user Snowflake users created in [install step 7](#2-install-standalone-spcs) are not dropped by teardown. If you ran the `hybrid` or `privatelink` network SQL, also drop its objects ([§ 7.8](teams-private-connectivity.md#78-tear-down-private-connectivity)).
 
 To remove the edge as well (it holds the service PAT as a secret):
 
@@ -336,7 +336,7 @@ Then revoke the PAT itself: `ALTER USER <pat-user> REMOVE PROGRAMMATIC ACCESS TO
 
 ## 6. Pages to Worker cutover
 
-This section applies to installs whose `TAB_BASE_HOST` is a `*.pages.dev` host from before the edge moved to a Worker. The Pages project keeps serving until you retire it, but `deploy-tab.sh` now deploys only the Worker, so edge fixes reach users only after the cutover. A Pages Function also cannot use a Workers VPC binding, so `privatelink` ([§ 7](private-connectivity.md)) needs the Worker.
+This section applies to installs whose `TAB_BASE_HOST` is a `*.pages.dev` host from before the edge moved to a Worker. The Pages project keeps serving until you retire it, but `deploy-tab.sh` now deploys only the Worker, so edge fixes reach users only after the cutover. A Pages Function also cannot use a Workers VPC binding, so `privatelink` ([§ 7](teams-private-connectivity.md)) needs the Worker.
 
 Four things are pinned to the edge host: the Entra Application ID URI, the Teams manifest (`webApplicationInfo.resource`, `validDomains`, the tab `contentUrl`), the Azure Bot messaging endpoint, and the service's `ALLOWED_ORIGINS`. Change them in this order. The old host keeps working until step 7, so users are not cut off midway.
 
@@ -347,14 +347,14 @@ Four things are pinned to the edge host: the Entra Application ID URI, the Teams
    az ad app update --id <OBO_CLIENT_ID> \
      --identifier-uris "api://<old-host>.pages.dev/<OBO_CLIENT_ID>" "api://<new-host>/<OBO_CLIENT_ID>"
    ```
-2. **Deploy the Worker on the new host.** In `apps/teams/.env` set `TAB_BASE_HOST` / `TAB_BASE_URL` to the new host and `EDGE_WORKER_NAME` to the Worker name (it takes precedence over a legacy `PAGES_PROJECT`). Then run the secrets script and the deploy, and attach the custom domain ([B.4](native-app.md#b4-cloudflare-worker)):
+2. **Deploy the Worker on the new host.** In `apps/teams/.env` set `TAB_BASE_HOST` / `TAB_BASE_URL` to the new host and `EDGE_WORKER_NAME` to the Worker name (it takes precedence over a legacy `PAGES_PROJECT`). Then run the secrets script and the deploy, and attach the custom domain ([B.4](teams-native-app.md#b4-cloudflare-worker)):
 
    ```bash
    bash apps/teams/scripts/set-edge-secrets.sh
    bash apps/teams/scripts/deploy-tab.sh
    ```
 
-   Check that `https://<new-host>/` serves the tab and that the edge probe ([§ 4](#4-verify)) on the new host returns `401` ([T6](troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress)). `BOT_LINKS` keeps the same KV id, and `set-edge-secrets.sh` reuses `EDGE_SESSION_SECRET` and `BOT_LINK_SECRET` from `apps/teams/.env`. Existing bot links therefore keep working on the new host. Tab users sign in again silently on first load, because the browser keeps the edge session per origin.
+   Check that `https://<new-host>/` serves the tab and that the edge probe ([§ 4](#4-verify)) on the new host returns `401` ([T6](teams-troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress)). `BOT_LINKS` keeps the same KV id, and `set-edge-secrets.sh` reuses `EDGE_SESSION_SECRET` and `BOT_LINK_SECRET` from `apps/teams/.env`. Existing bot links therefore keep working on the new host. Tab users sign in again silently on first load, because the browser keeps the edge session per origin.
 3. **Rebuild the manifest** for the new host. `generate.mjs` writes `validDomains`, `webApplicationInfo` and the tab URLs from `TAB_BASE_HOST`. If the app is published in the org catalog, first raise `version` in [`manifest.template.json`](../../packages/teams-manifest/manifest.template.json), because Teams Admin Center does not accept an update with the same version:
 
    ```bash

@@ -31,7 +31,7 @@ const MESSAGES: Record<UpstreamErrorCode, string> = {
 /**
  * Snowflake REST API codes meaning "network policy rejected the source IP/token"
  * before any user identity was even evaluated (error 390422; see
- * docs/teams/private-connectivity.md PL1). Distinguishing it from a real auth/identity failure
+ * docs/teams/teams-private-connectivity.md PL1). Distinguishing it from a real auth/identity failure
  * is safe: the numeric code carries no role name, object FQN, statement handle, or
  * SQL — it's the one piece of the upstream body this module can forward.
  */

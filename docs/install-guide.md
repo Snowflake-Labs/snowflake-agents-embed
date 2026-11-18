@@ -2,12 +2,12 @@
 
 Operator guide for standing up Snowflake Agents Embed: Cortex agent chat embedded in Microsoft Teams, shipped as **Snowflake Agents for Teams (Unofficial)**.
 
-**Complete this master guide first**, then follow [teams/install.md](teams/install.md).
+**Complete this master guide first**, then follow [teams/teams-install.md](teams/teams-install.md).
 
 This is the from-this-repo path (`snow app`, Wrangler, `az`). Teams has two installs:
 
-- **Path A, standalone SPCS (the default).** Skip [§ 5](#5-native-app-path-only) and start at [teams/install.md § 2](teams/install.md#2-install-standalone-spcs).
-- **Path B, Native App.** Use [§ 5](#5-native-app-path-only), then [teams/native-app.md](teams/native-app.md). If the Native App is already published as a listing, skip the provider image push in § 5 and start from the Snowsight install.
+- **Path A, standalone SPCS (the default).** Skip [§ 5](#5-native-app-path-only) and start at [teams/teams-install.md § 2](teams/teams-install.md#2-install-standalone-spcs).
+- **Path B, Native App.** Use [§ 5](#5-native-app-path-only), then [teams/teams-native-app.md](teams/teams-native-app.md). If the Native App is already published as a listing, skip the provider image push in § 5 and start from the Snowsight install.
 
 To replace an existing Path B install, tear down first ([§ 6](#6-tear-down-semantics) plus the leftover `DROP` list in the Teams guide), then start again at [§ 5](#5-native-app-path-only). To replace a Path A install, use the leftover `DROP` list in the Teams guide, then start again there.
 
@@ -43,7 +43,7 @@ A Native App install does not use `apps/teams/scripts/bootstrap-dev-spcs.sql`. T
 
 If this account already has leftover standalone objects (the `AGENTS_TEAMS` service, `COWORK_COMPUTE_POOL`, account-level `COWORK_*_EAI`, `CORTEX_TEAMS_OAUTH`), tear them down before installing the Native App, or grant the application `USAGE` on an existing `COWORK_*_EAI` when Create Service asks for it. Leftover `DROP` lists are in the Teams guide.
 
-Browsers never hold the Snowflake PAT, and the Teams tab holds only an opaque encrypted edge session (the user's Snowflake OAuth token stays in the edge). Still restrict each user's network policy to the egress ranges that call Snowflake (never an allow-all policy). The Teams edge attaches `SPCS_PAT` server-side. Teams also has `NETWORK_MODE=hybrid` and `privatelink` (preview, not yet validated); see [teams/private-connectivity.md § 7](teams/private-connectivity.md). Details: [authentication-patterns.md](authentication-patterns.md).
+Browsers never hold the Snowflake PAT, and the Teams tab holds only an opaque encrypted edge session (the user's Snowflake OAuth token stays in the edge). Still restrict each user's network policy to the egress ranges that call Snowflake (never an allow-all policy). The Teams edge attaches `SPCS_PAT` server-side. Teams also has `NETWORK_MODE=hybrid` and `privatelink` (preview, not yet validated); see [teams/teams-private-connectivity.md § 7](teams/teams-private-connectivity.md). Details: [authentication-patterns.md](authentication-patterns.md).
 
 ---
 
@@ -51,8 +51,8 @@ Browsers never hold the Snowflake PAT, and the Teams tab holds only an opaque en
 
 | Path | Guide | Service | Edge | Host UI |
 | --- | --- | --- | --- | --- |
-| A (default) | [teams/install.md § 2](teams/install.md#2-install-standalone-spcs) | Standalone `AGENTS_TEAMS` | Worker that serves `TAB_BASE_HOST` (SPA + `/token/exchange` + `/token/link` + `/api/*` proxy). Name from `EDGE_WORKER_NAME`, else legacy `PAGES_PROJECT`, else the `*.workers.dev` first label, else `agents-embed-teams`. Or the self-hosted Node edge | Teams tab + bot, sideloaded from `packages/teams-manifest` |
-| B | [teams/native-app.md](teams/native-app.md) | Native App `AGENTS_TEAMS_APP` | Same Worker | Same |
+| A (default) | [teams/teams-install.md § 2](teams/teams-install.md#2-install-standalone-spcs) | Standalone `AGENTS_TEAMS` | Worker that serves `TAB_BASE_HOST` (SPA + `/token/exchange` + `/token/link` + `/api/*` proxy). Name from `EDGE_WORKER_NAME`, else legacy `PAGES_PROJECT`, else the `*.workers.dev` first label, else `agents-embed-teams`. Or the self-hosted Node edge | Teams tab + bot, sideloaded from `packages/teams-manifest` |
+| B | [teams/teams-native-app.md](teams/teams-native-app.md) | Native App `AGENTS_TEAMS_APP` | Same Worker | Same |
 
 ---
 
@@ -127,7 +127,7 @@ Common Native App failures (full tables are in the Teams guide):
 
 ## 5. Native App path only
 
-This section is Path B only. Standalone installs (Path A) skip it and continue at [teams/install.md § 2](teams/install.md#2-install-standalone-spcs) after [§ 3](#3-shared-prerequisites) and [§ 4](#4-shared-conventions).
+This section is Path B only. Standalone installs (Path A) skip it and continue at [teams/teams-install.md § 2](teams/teams-install.md#2-install-standalone-spcs) after [§ 3](#3-shared-prerequisites) and [§ 4](#4-shared-conventions).
 
 Two routes. Use **Provider (this repo)** when you are building the application package yourself. Use **Consumer (listing)** when the package is already published.
 
@@ -144,11 +144,11 @@ Two routes. Use **Provider (this repo)** when you are building the application p
    The script is `--no-interactive`: it does not grant account privileges. `snow app run` may print reference-callback warnings; the procedures exist in `setup.sql` and the install can continue.
 4. **Grant account privileges**, then application roles (`APP_ADMIN` to the installer, `APP_PUBLIC` to ordinary users). `APP_ADMIN` is required to set secrets and create/roll the SPCS service.
 
-Concrete database names, Docker tags, grant SQL, and screenshots are in [teams/native-app.md](teams/native-app.md).
+Concrete database names, Docker tags, grant SQL, and screenshots are in [teams/teams-native-app.md](teams/teams-native-app.md).
 
 ### Publish the listing (provider, for another account)
 
-Publish the **application package** (`AGENTS_TEAMS_APP_PACKAGE`), not the provider's installed application object. Same-account listing install is not a valid test. Names and SQL: [teams/native-app.md](teams/native-app.md#publish-the-listing-provider-for-another-account).
+Publish the **application package** (`AGENTS_TEAMS_APP_PACKAGE`), not the provider's installed application object. Same-account listing install is not a valid test. Names and SQL: [teams/teams-native-app.md](teams/teams-native-app.md#publish-the-listing-provider-for-another-account).
 
 1. From `apps/teams/native-app`, point the default release directive at the version: `snow app publish --version v1 --patch 0 --no-interactive`.
 2. If the consumer is in another organization: `ALTER APPLICATION PACKAGE … SET DISTRIBUTION = EXTERNAL` and wait for the security scan to pass.
@@ -156,7 +156,7 @@ Publish the **application package** (`AGENTS_TEAMS_APP_PACKAGE`), not the provid
 
 ### Consumer path (published listing)
 
-In the consumer account: Catalog → Apps → Recently shared with you → Get. Accept the same privilege grants, name the app to match the Teams guide SQL, then run the application-role SQL there against a **consumer-side** PAT user. Continue at [teams/native-app.md](teams/native-app.md) (Streamlit). Path A never uses a listing.
+In the consumer account: Catalog → Apps → Recently shared with you → Get. Accept the same privilege grants, name the app to match the Teams guide SQL, then run the application-role SQL there against a **consumer-side** PAT user. Continue at [teams/teams-native-app.md](teams/teams-native-app.md) (Streamlit). Path A never uses a listing.
 
 ---
 

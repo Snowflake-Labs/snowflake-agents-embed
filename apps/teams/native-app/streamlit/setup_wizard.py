@@ -713,7 +713,7 @@ keep the saved mode, so a roll never silently switches back to public.
     elif saved_mode != "public":
         st.warning(
             "Switching back to public: after the roll, put back the integration policy you "
-            "had before (T8 in docs/teams/troubleshooting.md). The compute pool policy does not cover "
+            "had before (T8 in docs/teams/teams-troubleshooting.md). The compute pool policy does not cover "
             "the public SPCS egress, so calls fail with `390422` while it is attached."
         )
     if st.button("Save network mode", disabled=mode == saved_mode):

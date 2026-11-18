@@ -88,7 +88,7 @@ if command -v az >/dev/null && [[ -n "$OBO_CLIENT_ID" ]]; then
     elif [[ "$TV" == 2 ]]; then ok "Snowflake Entra app issues v2 tokens"
     else fail "Snowflake Entra app requestedAccessTokenVersion is ${TV}, expected 2 (az ad app update --id ${SNOW_APP} --requested-access-token-version 2)"; fi
     grep -qx upn <<<"$UPN" && ok "Snowflake Entra app has the upn optional claim" \
-      || fail "Snowflake Entra app lacks the upn optional claim (docs/teams/install.md step 6a)"
+      || fail "Snowflake Entra app lacks the upn optional claim (docs/teams/teams-install.md step 6a)"
   fi
 else
   skip "az not available: identifier URI not checked"

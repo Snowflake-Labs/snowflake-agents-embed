@@ -13,7 +13,7 @@
   // REPLACE_WITH_VPC_SERVICE_ID. Never put real ids in this file. deploy-tab.sh --create makes the KV
   // namespace and writes its id to .env; by hand: wrangler kv namespace create BOT_LINKS
   //
-  // Custom domain (recommended over workers.dev, see docs/teams/install.md): set EDGE_CUSTOM_DOMAIN in
+  // Custom domain (recommended over workers.dev, see docs/teams/teams-install.md): set EDGE_CUSTOM_DOMAIN in
   // apps/teams/.env. deploy-tab.sh adds { "pattern": <domain>, "custom_domain": true } to the rendered config.
   "name": "agents-embed-teams",
   "main": "src/workers/index.ts",

@@ -1,6 +1,6 @@
 # Teams private connectivity (optional)
 
-Adds the `hybrid` and `privatelink` network modes to an existing install. Complete [install.md](install.md) first.
+Adds the `hybrid` and `privatelink` network modes to an existing install. Complete [teams-install.md](teams-install.md) first.
 
 > **Validation status.**
 >
@@ -24,7 +24,7 @@ Both modes are designed for AWS PrivateLink, Azure Private Link and Google Cloud
 
 | Mode                 | Edge → SPCS ingress                                                                                                                | Container → Snowflake                                                                                                                                                               | Policies ([§ 7.4](#74-network-sql-accountadmin))                                                                                                                                                                                                |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `public` (default) | Worker, global`fetch` to the public `ingress_url`                                                                               | `SNOWFLAKE_HOST_MODE=account`: the org-account host over the public NAT                                                                                                            | [T7](troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake) on the PAT user (Cloudflare IPs), [T8](troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) on `CORTEX_TEAMS_OAUTH` (NAT `/24`) if needed                                    |
+| `public` (default) | Worker, global`fetch` to the public `ingress_url`                                                                               | `SNOWFLAKE_HOST_MODE=account`: the org-account host over the public NAT                                                                                                            | [T7](teams-troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake) on the PAT user (Cloudflare IPs), [T8](teams-troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) on `CORTEX_TEAMS_OAUTH` (NAT `/24`) if needed                                    |
 | `hybrid`           | Same as public                                                                                                                      | `SNOWFLAKE_HOST_MODE=account` (as in public). `internal` only accepts the SPCS service token, so user tokens get `395090` ([PL8](#pl8-395090-with-snowflake_host_modeinternal)) | Designed:`COMPUTE_POOL` rule on `CORTEX_TEAMS_OAUTH`. With `account` mode keep the T8 NAT policy; T7 kept                                                                                                                                 |
 | `privatelink`      | Worker`env.privatelink` through the `SPCS_VPC` Workers VPC binding (cloudflared in your network) to `privatelink_ingress_url` | Same as hybrid:`account` today, so this hop still leaves SPCS over its public NAT                                                                                                  | PAT user limited to your private endpoint IDs (does not currently refuse internet use,[PL9](#pl9-the-pat-still-works-from-the-internet)); T7 policy still the working control; optional `ENFORCE_PRIVATELINK_ACCESS_ONLY` (no observed effect) |
 
@@ -93,7 +93,7 @@ The Teams client, Entra and the Bot Connector are always public. In every mode:
   - The `SPCS_VPC` binding needs Workers VPC (beta) on the Cloudflare account.
 - **No `executeAsCaller`** in the service spec. The `COMPUTE_POOL` rule does not cover caller's-rights tokens, so `deploy-spcs.sh` refuses `hybrid` and `privatelink` if the spec sets it.
 
-Native App: pick the mode on wizard tab 8 ([Tab 8: Network](native-app.md#b3-streamlit)). It runs the same detection and generates the same SQL as below. Then **Create Service** or **Roll service** on tab 9 applies `service_spec_private.yml`. The Native App path is the least tested: a Native App may reject the spec's `capabilities` block. If **Create Service** fails on it, stay on `public` and report the error.
+Native App: pick the mode on wizard tab 8 ([Tab 8: Network](teams-native-app.md#b3-streamlit)). It runs the same detection and generates the same SQL as below. Then **Create Service** or **Roll service** on tab 9 applies `service_spec_private.yml`. The Native App path is the least tested: a Native App may reject the spec's `capabilities` block. If **Create Service** fails on it, stay on `public` and report the error.
 
 ## 7.3 Path A (standalone SPCS)
 
@@ -106,11 +106,11 @@ Native App: pick the mode on wizard tab 8 ([Tab 8: Network](native-app.md#b3-str
 1. For `privatelink`, set `NETWORK_MODE=privatelink` in `apps/teams/.env` when you deploy the edge ([§ 7.6](#76-edge-in-privatelink-workers-vpc)). `deploy-spcs.sh` is safe with it set: it keeps `account` host mode.
 2. As ACCOUNTADMIN, apply the network SQL ([§ 7.4](#74-network-sql-accountadmin)). Skip the pool rule part; it is only needed for `internal` mode.
 3. Service:
-   - **New install**: in [`create-dev-service.sql`](../../apps/teams/scripts/create-dev-service.sql) keep `SNOWFLAKE_HOST_MODE: account` and leave the `capabilities` block commented ([install step 5](install.md#2-install-standalone-spcs)). `internal` (set it and uncomment the block) works only for the SPCS service identity; user tokens get `395090`.
+   - **New install**: in [`create-dev-service.sql`](../../apps/teams/scripts/create-dev-service.sql) keep `SNOWFLAKE_HOST_MODE: account` and leave the `capabilities` block commented ([install step 5](teams-install.md#2-install-standalone-spcs)). `internal` (set it and uncomment the block) works only for the SPCS service identity; user tokens get `395090`.
    - **Existing service**: confirm the live spec still says `account` after any roll.
 4. `bash apps/teams/scripts/deploy-spcs.sh`. With `NETWORK_MODE=hybrid` it prints `network mode: hybrid (SNOWFLAKE_HOST_MODE=account, enableCustomCredentials=false)`. If `docker push` says `unauthorized`, the script built an uppercase registry host: set a lowercase `SNOWFLAKE_REGISTRY_HOST` in `apps/teams/.env`.
 5. Leave the `SNOWFLAKE_ACCOUNT_NAME` secret in the org-account form that `bootstrap-dev-spcs.sql` writes. Never use the `.privatelink` host: it does not resolve inside SPCS, and the server warns at boot if it sees one.
-6. `hybrid` is done here. Verify chat, streaming and the bot ([install.md § 4](install.md#4-verify)).
+6. `hybrid` is done here. Verify chat, streaming and the bot ([teams-install.md § 4](teams-install.md#4-verify)).
 7. `privatelink` continues:
    - `SHOW ENDPOINTS IN SERVICE AGENTS_TEAMS_APP_DB.PUBLIC.AGENTS_TEAMS;`. `privatelink_ingress_url` shows "Endpoints provisioning in progress..." for about a minute after the service is `READY`; poll until it appears. Then copy `privatelink_ingress_url` into `apps/teams/.env` as `SPCS_BASE=https://<privatelink_ingress_url>`. Copy it verbatim; do not rebuild it from the wildcard.
    - Add the private DNS records ([§ 7.5](#75-private-dns)).
@@ -141,7 +141,7 @@ ALTER NETWORK POLICY AGENTS_TEAMS_POOL_POLICY SET ALLOWED_NETWORK_RULE_LIST = (A
 ALTER SECURITY INTEGRATION CORTEX_TEAMS_OAUTH SET NETWORK_POLICY = AGENTS_TEAMS_POOL_POLICY;
 ```
 
-Setting this policy replaces the [T8](troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) NAT policy on the integration, so only do it when you run `internal` mode. In `account` mode keep the T8 policy. Keep `AGENTS_TEAMS_SPCS_POLICY` if you have one, so switching back is one `ALTER`.
+Setting this policy replaces the [T8](teams-troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) NAT policy on the integration, so only do it when you run `internal` mode. In `account` mode keep the T8 policy. Keep `AGENTS_TEAMS_SPCS_POLICY` if you have one, so switching back is one `ALTER`.
 
 **privatelink only: edge → private ingress.** Use the rule `TYPE` for your cloud:
 
@@ -276,12 +276,12 @@ The same Worker serves the tab. Its `env.privatelink` sends only SPCS calls thro
    ```
 
    - `set-edge-secrets.sh` refuses an empty `SPCS_BASE` in this mode, and warns if it does not look like a private ingress.
-   - `deploy-tab.sh` deploys `--env privatelink` under the same Worker name. Never pass `--env privatelink` to `wrangler tail` or `secret` commands ([Seeing the actual edge Worker error](troubleshooting.md#seeing-the-actual-edge-worker-error)).
+   - `deploy-tab.sh` deploys `--env privatelink` under the same Worker name. Never pass `--env privatelink` to `wrangler tail` or `secret` commands ([Seeing the actual edge Worker error](teams-troubleshooting.md#seeing-the-actual-edge-worker-error)).
 5. **Policy.** Apply the privatelink part of [§ 7.4](#74-network-sql-accountadmin) to the PAT user, if you have not already (defence in depth; see the caveat there).
 6. **Verify.** This path was validated end to end on AWS PrivateLink (Bot Connector → Worker → `cloudflared` host → private ingress → container, tab chat and a real Teams bot message) and on Azure Private Link and GCP Private Service Connect (same path; edge probes, tab chat and the bot e2e script suite 1).
 
    - After the first `wrangler deploy` of a new Worker name, `workers.dev` returns Cloudflare error `1042` (a 404) for about 20 seconds while the route propagates. Retry before debugging.
-   - The edge probe ([install.md § 4](install.md#4-verify)) through `https://<TAB_BASE_HOST>` returns `401`. The edge answers it without calling SPCS, so it proves only that the Worker started with its binding ([PL6](#pl6-edge-misconfigured-500-in-privatelink)).
+   - The edge probe ([teams-install.md § 4](teams-install.md#4-verify)) through `https://<TAB_BASE_HOST>` returns `401`. The edge answers it without calling SPCS, so it proves only that the Worker started with its binding ([PL6](#pl6-edge-misconfigured-500-in-privatelink)).
    - The tab lists agents and a chat streams. This is the first request that crosses the tunnel.
    - A bot message gets a reply.
    - a direct PAT request to `https://<privatelink_ingress_url>` succeeds from inside the network. From the internet it also succeeded in testing ([PL9](#pl9-the-pat-still-works-from-the-internet)), so do not use a laptop result as evidence either way.
@@ -315,12 +315,12 @@ The same edge core runs as a Node container inside your network, with no Cloudfl
 
    - Put `/data` on an encrypted volume (KMS-encrypted EBS, an Azure managed disk with encryption, or a CMEK persistent disk). The bot-link values are already sealed with `BOT_LINK_SECRET`, but the disk should not be readable either.
    - The store is SQLite with an exclusive lock, so a second replica on the same volume fails at startup ([PL7](#pl7-the-node-edge-will-not-start-or-the-link-store-is-locked)). For high availability use the Worker edge.
-4. **DNS and TLS.** The container host must use the private DNS from [§ 7.5](#75-private-dns). Point `TAB_BASE_HOST` at the load balancer, then follow the host cutover in [§ 6](install.md#6-pages-to-worker-cutover) (Entra identifier URI, manifest, bot endpoint, `ROLL_SERVER_SERVICE` for CORS), skipping the Cloudflare steps.
+4. **DNS and TLS.** The container host must use the private DNS from [§ 7.5](#75-private-dns). Point `TAB_BASE_HOST` at the load balancer, then follow the host cutover in [§ 6](teams-install.md#6-pages-to-worker-cutover) (Entra identifier URI, manifest, bot endpoint, `ROLL_SERVER_SERVICE` for CORS), skipping the Cloudflare steps.
 5. **Policy.** Apply the privatelink part of [§ 7.4](#74-network-sql-accountadmin). If the container's egress comes through a private endpoint, its endpoint ID goes in the PAT user's rule.
 6. **Verify.**
 
    - `curl https://<TAB_BASE_HOST>/healthz` returns `ok`, and `/config` returns the tab shell, not a 404.
-   - The edge probe ([install.md § 4](install.md#4-verify)) returns `401`. As with the Worker, the edge answers it without calling SPCS.
+   - The edge probe ([teams-install.md § 4](teams-install.md#4-verify)) returns `401`. As with the Worker, the edge answers it without calling SPCS.
    - A tab chat streams and a bot message gets a reply. These are the first requests that cross the private hop.
    - `docker exec teams-edge stat -c '%a' /data /data/bot-links.sqlite` prints `700` and `600`.
 
@@ -328,7 +328,7 @@ The same edge core runs as a Node container inside your network, with no Cloudfl
 
 ### PL1. `390422` after switching to hybrid or privatelink
 
-**Symptom.** After the roll, the tab shows "Your Snowflake account's network policy is blocking this connection" ([T8](troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) banner). The container log has `390422`. It happens for every user, or only for some.
+**Symptom.** After the roll, the tab shows "Your Snowflake account's network policy is blocking this connection" ([T8](teams-troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) banner). The container log has `390422`. It happens for every user, or only for some.
 
 **Cause.**
 
@@ -370,7 +370,7 @@ The same edge core runs as a Node container inside your network, with no Cloudfl
 - `401` "Incoming request with IP/Token … is not allowed": the network policy check.
 - `403 Insufficient privileges to use <ingress>`: the endpoint grant check.
 
-The edge probe in [install.md § 4](install.md#4-verify) still returns `401 {"error":"Unauthorized"}`, because it never reaches the ingress.
+The edge probe in [teams-install.md § 4](teams-install.md#4-verify) still returns `401 {"error":"Unauthorized"}`, because it never reaches the ingress.
 
 **Cause.** For the `401`, one of three:
 
@@ -379,13 +379,13 @@ The edge probe in [install.md § 4](install.md#4-verify) still returns `401 {"er
 - The user still has the Cloudflare IP policy (T7), which a private-endpoint request cannot match.
 - The Worker still runs the public env, or `SPCS_BASE` is still the public ingress. The request then arrives from a Cloudflare IP, which the endpoint-ID policy rejects.
 
-For the `403`, the PAT user lacks `ALL_ENDPOINTS_USAGE` / `APP_PUBLIC` ([T6](troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress)).
+For the `403`, the PAT user lacks `ALL_ENDPOINTS_USAGE` / `APP_PUBLIC` ([T6](teams-troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress)).
 
 **Fix.**
 
 - `SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN USER <pat-user>;` should name `AGENTS_TEAMS_PL_INGRESS_POLICY`. Check its rule's `VALUE_LIST` against the endpoint ID on the tunnel host's network, then re-run [§ 7.4](#74-network-sql-accountadmin) with the right IDs.
 - Check that `apps/teams/.env` `SPCS_BASE` is `https://<privatelink_ingress_url>`, then run `set-edge-secrets.sh` and `deploy-tab.sh --privatelink`.
-- For the `403`, apply the grant in [T6](troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress).
+- For the `403`, apply the grant in [T6](teams-troubleshooting.md#t6-api-fails-at-the-edge-or-the-ingress).
 
 **Verify.**
 
@@ -440,7 +440,7 @@ For the `403`, the PAT user lacks `ALL_ENDPOINTS_USAGE` / `APP_PUBLIC` ([T6](tro
 - Restore `env.privatelink.vpc_services` with the real service ID ([§ 7.6](#76-edge-in-privatelink-workers-vpc) step 3), and redeploy with `deploy-tab.sh --privatelink`.
 - For the bot, re-run `set-edge-secrets.sh` with `BOT_APP_ID` set.
 
-**Verify.** `wrangler tail <worker-name>` shows no `Edge misconfigured` lines and the edge probe ([install.md § 4](install.md#4-verify)) returns `401`. The probe proves the binding is present, not that the tunnel works; a tab chat proves that ([§ 7.6](#76-edge-in-privatelink-workers-vpc)).
+**Verify.** `wrangler tail <worker-name>` shows no `Edge misconfigured` lines and the edge probe ([teams-install.md § 4](teams-install.md#4-verify)) returns `401`. The probe proves the binding is present, not that the tunnel works; a tab chat proves that ([§ 7.6](#76-edge-in-privatelink-workers-vpc)).
 
 ### PL7. The Node edge will not start, or the link store is locked
 
@@ -495,7 +495,7 @@ For the `403`, the PAT user lacks `ALL_ENDPOINTS_USAGE` / `APP_PUBLIC` ([T6](tro
 
 ### PL11. Account network policy blocks the container's egress (`account` host mode)
 
-**Symptom.** The tab shows "Your Snowflake account's network policy is blocking this connection" ([T8](troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) banner) and the agent selector is empty, but the PAT user works. Seen on Azure and GCP accounts with an account-wide IP allow-list.
+**Symptom.** The tab shows "Your Snowflake account's network policy is blocking this connection" ([T8](teams-troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call) banner) and the agent selector is empty, but the PAT user works. Seen on Azure and GCP accounts with an account-wide IP allow-list.
 
 **Cause.** In `account` host mode the container reaches Snowflake over the public internet from an SPCS egress pool, not one address (three addresses in one `/24` appeared on Azure; `35.246.9.223` on GCP `europe-west2`, so allow `35.246.9.0/24` there). The range differs by cloud and region: read it from your own blocked rows. `LOGIN_HISTORY` shows the signed-in user from the SPCS address with `INCOMING_REQUEST_BLOCKED`, while the PAT user, whose own policy applies, succeeds.
 
@@ -566,14 +566,14 @@ If you enforced private-only access, revert it before step 1, because the `publi
 1. **Container.**
 
    - Switch the mode back. Native App: on wizard tab 8 pick **public**, then **Roll service** on tab 9. Path A: set `NETWORK_MODE=public` and run `deploy-spcs.sh`.
-   - Then, as ACCOUNTADMIN, put the integration back on its public policy ([T8](troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call)), or unset it:
+   - Then, as ACCOUNTADMIN, put the integration back on its public policy ([T8](teams-troubleshooting.md#t8-account-network-policy-blocks-the-spcs-to-cortex-call)), or unset it:
 
      ```sql
      ALTER SECURITY INTEGRATION CORTEX_TEAMS_OAUTH SET NETWORK_POLICY = AGENTS_TEAMS_SPCS_POLICY;   -- or UNSET NETWORK_POLICY
      ```
 2. **Edge** (privatelink only).
 
-   - Put the PAT user back on the Cloudflare IP policy ([T7](troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake)): `ALTER USER AGENTS_TEAMS_SVC SET NETWORK_POLICY = AGENTS_TEAMS_INGRESS_POLICY;`.
+   - Put the PAT user back on the Cloudflare IP policy ([T7](teams-troubleshooting.md#t7-cloudflare-ip-is-not-allowed-to-access-snowflake)): `ALTER USER AGENTS_TEAMS_SVC SET NETWORK_POLICY = AGENTS_TEAMS_INGRESS_POLICY;`.
    - Set `SPCS_BASE` back to the public `ingress_url` (or remove it, so `set-edge-secrets.sh` uses `SPCS_INGRESS_HOST`) and `NETWORK_MODE=public`. Then run `set-edge-secrets.sh` and `deploy-tab.sh --public`.
 3. **Drop the private objects.** Remove the pool rule first from any user-level policy you added it to in [§ 7.4](#74-network-sql-accountadmin) (`REMOVE ALLOWED_NETWORK_RULE_LIST`, or `SET` without it). Then:
 

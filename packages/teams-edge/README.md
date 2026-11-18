@@ -36,7 +36,7 @@ Cloudflare. Image: `apps/teams/edge.Dockerfile`. Start locally with `npm start -
 - `sqlite-kv.ts`: bot-link store (`node:sqlite`, Node 22.13+). Refuses root, requires dir `0700`
   and file `0600` owned by the running user, and holds an exclusive lock, so run one replica per volume.
 
-Run and verify: [teams/private-connectivity.md § 7.6a](../../docs/teams/private-connectivity.md#76a-edge-in-privatelink-self-hosted-node-edge).
+Run and verify: [teams/teams-private-connectivity.md § 7.6a](../../docs/teams/teams-private-connectivity.md#76a-edge-in-privatelink-self-hosted-node-edge).
 
 ## Deploy
 

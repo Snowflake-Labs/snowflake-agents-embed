@@ -26,7 +26,7 @@ Microsoft Teams
 
 Token exchange lives on the **edge** because it must be reachable *before* any Snowflake token exists — the SPCS public endpoint always requires Snowflake auth. The browser never calls SPCS and never holds the service PAT or the user's Snowflake token: `/token/exchange` returns only an encrypted edge session, and the Worker's `/api/*` proxy decrypts it per request, injects the user's token as `X-User-Access-Token`, and authenticates to the SPCS ingress with `SPCS_PAT`.
 
-`NETWORK_MODE` (`public` default, `hybrid`, `privatelink`) changes the network path, not this flow. `hybrid` keeps the public ingress but points the container at the SPCS-injected internal `SNOWFLAKE_HOST`, gated by a `COMPUTE_POOL` network rule on `CORTEX_TEAMS_OAUTH`. `privatelink` (preview, not yet validated end to end) sends the Worker's SPCS calls through a Workers VPC binding to the `privatelink_ingress_url`, restricts the PAT user to your private-endpoint IDs, and verifies the Bot Connector JWT at the edge. A self-hosted Node edge (`edge.Dockerfile`) is the alternative when a Cloudflare tunnel is not allowed. See [Private connectivity](../../docs/teams/private-connectivity.md).
+`NETWORK_MODE` (`public` default, `hybrid`, `privatelink`) changes the network path, not this flow. `hybrid` keeps the public ingress but points the container at the SPCS-injected internal `SNOWFLAKE_HOST`, gated by a `COMPUTE_POOL` network rule on `CORTEX_TEAMS_OAUTH`. `privatelink` (preview, not yet validated end to end) sends the Worker's SPCS calls through a Workers VPC binding to the `privatelink_ingress_url`, restricts the PAT user to your private-endpoint IDs, and verifies the Bot Connector JWT at the edge. A self-hosted Node edge (`edge.Dockerfile`) is the alternative when a Cloudflare tunnel is not allowed. See [Private connectivity](../../docs/teams/teams-private-connectivity.md).
 
 ## Monorepo layout
 
@@ -86,7 +86,7 @@ bash apps/teams/scripts/set-edge-secrets.sh
 bash apps/teams/scripts/deploy-tab.sh            # or --privatelink
 ```
 
-`deploy-tab.sh` builds the tab and runs `wrangler deploy` from `packages/teams-edge`. The Worker name comes from `EDGE_WORKER_NAME`, else legacy `PAGES_PROJECT`, else the first label of a `*.workers.dev` `TAB_BASE_HOST`, else `agents-embed-teams`. `set-pages-secrets.sh` is a deprecation shim for `set-edge-secrets.sh`. Moving an existing `*.pages.dev` install: [Pages to Worker cutover](../../docs/teams/install.md#6-pages-to-worker-cutover).
+`deploy-tab.sh` builds the tab and runs `wrangler deploy` from `packages/teams-edge`. The Worker name comes from `EDGE_WORKER_NAME`, else legacy `PAGES_PROJECT`, else the first label of a `*.workers.dev` `TAB_BASE_HOST`, else `agents-embed-teams`. `set-pages-secrets.sh` is a deprecation shim for `set-edge-secrets.sh`. Moving an existing `*.pages.dev` install: [Pages to Worker cutover](../../docs/teams/teams-install.md#6-pages-to-worker-cutover).
 
 ### Server → Snowflake Native App on SPCS
 
@@ -133,5 +133,5 @@ Cloudflare Worker edge secrets (`set-edge-secrets.sh`): `AZURE_TENANT_ID`, `OBO_
 
 ## Documentation
 
-- Host install guide: [`docs/teams/install.md`](../../docs/teams/install.md)
-- Troubleshooting: [`docs/teams/troubleshooting.md` §4](../../docs/teams/troubleshooting.md)
+- Host install guide: [`docs/teams/teams-install.md`](../../docs/teams/teams-install.md)
+- Troubleshooting: [`docs/teams/teams-troubleshooting.md` §4](../../docs/teams/teams-troubleshooting.md)
