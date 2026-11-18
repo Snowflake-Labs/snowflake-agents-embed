@@ -440,6 +440,42 @@ describe('useAgentStream telemetry (Phase 13)', () => {
     }))
   })
 
+  it('keeps a completed answer as done when the connection drops before the terminal event', async () => {
+    const telemetry = vi.fn()
+    setHostAdapter({ baseUrl: () => '', headers: () => ({}), telemetry })
+    const tempId = useChatStore.getState().newThread('DB.SCH.AG')
+    vi.spyOn(api, 'streamAgentRun').mockImplementation(async function* () {
+      yield { kind: 'text', text: 'full answer' }
+      throw new TypeError('network error')
+    } as any)
+
+    const { result } = renderHook(() => useAgentStream('tok'))
+    await act(async () => {
+      await result.current.stream({ tempId, query: 'q', agentFqn: 'DB.SCH.AG' })
+    })
+
+    const turn = useChatStore.getState().openThreads[tempId].turns.at(-1)!
+    expect(turn.status).toBe('done')
+    expect(turn.errorMessage).toBeUndefined()
+    expect(telemetry).toHaveBeenCalledWith('tok', 'agent_run', expect.objectContaining({ errorClass: 'stream_cut_after_answer' }))
+  })
+
+  it('still errors on a network failure before any final answer text', async () => {
+    setHostAdapter({ baseUrl: () => '', headers: () => ({}) })
+    const tempId = useChatStore.getState().newThread('DB.SCH.AG')
+    vi.spyOn(api, 'streamAgentRun').mockImplementation(async function* () {
+      yield { kind: 'text.delta', text: 'part' }
+      throw new TypeError('network error')
+    } as any)
+
+    const { result } = renderHook(() => useAgentStream('tok'))
+    await act(async () => {
+      await result.current.stream({ tempId, query: 'q', agentFqn: 'DB.SCH.AG' })
+    })
+
+    expect(useChatStore.getState().openThreads[tempId].turns.at(-1)!.status).toBe('error')
+  })
+
   it('never throws when the host adapter has no telemetry method', async () => {
     setHostAdapter({ baseUrl: () => '', headers: () => ({}) })
     const tempId = useChatStore.getState().newThread('DB.SCH.AG')

@@ -110,6 +110,9 @@ export function useAgentStream(snowflakeToken: string) {
     const toolNames: string[] = []
     let aborted = false
     let sawTerminal = false
+    // The consolidated `text` event arrives after the last delta; once seen, the answer is complete
+    // even if the connection drops before the terminal `response` event.
+    let sawFinalText = false
     let errorClass: string | undefined
     const unknownEvents: string[] = []
     let parseFailures = 0
@@ -273,6 +276,7 @@ export function useAgentStream(snowflakeToken: string) {
           case 'text': {
             markFirstAnswer()
             noteAnswer()
+            if (e.text) sawFinalText = true
             // Set, never append — see textByIndex above.
             textByIndex.set(e.contentIndex ?? 0, e.text)
             flushNow()
@@ -397,7 +401,10 @@ export function useAgentStream(snowflakeToken: string) {
       // Flush first either way, so a partial answer isn't lost by an error or a user stop
       // arriving between the last frame and the last delta.
       flushNow()
-      if (err.name !== 'AbortError') {
+      if (err.name === 'TypeError' && sawFinalText) {
+        errorClass = 'stream_cut_after_answer'
+        update((t) => ({ ...t, status: t.status === 'error' ? 'error' : 'done', statusLabel: undefined }))
+      } else if (err.name !== 'AbortError') {
         errorClass = err.code ?? err.name ?? 'unknown'
         update((t) => ({ ...t, status: 'error', statusLabel: undefined, errorMessage: translateError(err) }))
       } else {
@@ -408,8 +415,10 @@ export function useAgentStream(snowflakeToken: string) {
       flushNow()
       stopFlushing()
       if (!aborted && !sawTerminal) {
-        errorClass = errorClass ?? 'stream_eof_no_terminal'
-        update((t) => t.status === 'streaming' ? { ...t, status: 'error', interrupted: true } : t)
+        errorClass = errorClass ?? (sawFinalText ? 'stream_cut_after_answer' : 'stream_eof_no_terminal')
+        update((t) => t.status === 'streaming'
+          ? (sawFinalText ? { ...t, status: 'done', statusLabel: undefined } : { ...t, status: 'error', interrupted: true })
+          : t)
       }
       setStreaming(tempId, false)
       if (abortByTempId.current.get(tempId) === abort) abortByTempId.current.delete(tempId)
