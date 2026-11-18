@@ -46,6 +46,29 @@ jobs:
           done
           docker logs smoke
           exit 1
+      - name: Production auth-mode boot (route gating and fail-closed config)
+        run: |
+          docker run -d --name prod -p 3001:3000 \
+            -e TEAMS_AUTH_MODE=production -e SNOWFLAKE_ACCOUNT=ci-org-ci-acct \
+            -e AZURE_TENANT_ID=00000000-0000-0000-0000-000000000000 \
+            -e OBO_CLIENT_ID=ci-client -e OBO_CLIENT_SECRET=ci-secret \
+            -e SNOWFLAKE_SCOPE=session:role-any -e ALLOWED_ORIGINS=https://example.com \
+            -e DEFAULT_AGENT_FQN=DB.SCH.AGENT agents-teams-server:ci
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:3001/healthz && break
+            sleep 1
+          done
+          code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          [ "$(code http://127.0.0.1:3001/healthz)" = 200 ] || { docker logs prod; exit 1; }
+          [ "$(code -X POST http://127.0.0.1:3001/api/token/exchange)" = 404 ] || { echo "token route exposed in production"; exit 1; }
+          [ "$(code http://127.0.0.1:3001/api/agents)" = 401 ] || { echo "unauthenticated /api/agents not rejected"; exit 1; }
+          # Missing ALLOWED_ORIGINS must fail closed.
+          if docker run --rm \
+            -e TEAMS_AUTH_MODE=production -e SNOWFLAKE_ACCOUNT=ci-org-ci-acct \
+            -e AZURE_TENANT_ID=t -e OBO_CLIENT_ID=c -e OBO_CLIENT_SECRET=s -e SNOWFLAKE_SCOPE=sc \
+            agents-teams-server:ci >/dev/null 2>&1; then
+            echo "production booted without ALLOWED_ORIGINS"; exit 1
+          fi
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: agents-teams-server:ci

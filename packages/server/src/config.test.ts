@@ -65,6 +65,23 @@ describe('parseConfig', () => {
     })).toThrow(/ALLOWED_ORIGINS/)
   })
 
+  it.each(['AZURE_TENANT_ID', 'OBO_CLIENT_ID', 'OBO_CLIENT_SECRET', 'SNOWFLAKE_SCOPE'])(
+    'fails in production when %s is missing',
+    (missing) => {
+      const env: Record<string, string> = {
+        TEAMS_AUTH_MODE: 'production',
+        SNOWFLAKE_ACCOUNT: 'dev',
+        AZURE_TENANT_ID: 't',
+        OBO_CLIENT_ID: 'c',
+        OBO_CLIENT_SECRET: 's',
+        SNOWFLAKE_SCOPE: 'sc',
+        ALLOWED_ORIGINS: 'https://example.com',
+      }
+      delete env[missing]
+      expect(() => parseConfig(env)).toThrow(missing)
+    },
+  )
+
   it('parses ALLOWED_ORIGINS and does not inject localhost in production', () => {
     const cfg = parseConfig({
       TEAMS_AUTH_MODE: 'production',
