@@ -12,7 +12,7 @@ It calls public [Cortex Agents](https://docs.snowflake.com/en/user-guide/snowfla
 APIs. It is not [Snowflake CoWork](https://docs.snowflake.com/en/user-guide/snowflake-cortex/snowflake-cowork)
 (the first-party Snowsight UI) and is not the official Cortex Agents Teams integration.
 
-This repository is Teams-only.
+This repository is Teams-only with plans to add support for other apps (Tableau, Salesforce, PowerBI etc.)
 
 ## What it does
 
